@@ -119,7 +119,7 @@ export default function AiChat({ chat }: { chat: AiChatState }) {
       </div>
 
       <form
-        className="flex items-end gap-2 border-t border-border p-2"
+        className="relative border-t border-border p-2"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -138,13 +138,14 @@ export default function AiChat({ chat }: { chat: AiChatState }) {
           maxLength={4000}
           placeholder="Ask for a change…"
           aria-label="Message the AI assistant"
-          className="min-h-[52px] min-w-0 flex-1 resize-y rounded-md border border-border bg-panel px-2.5 py-1.5 text-[13px] text-fg outline-none placeholder:text-muted focus:border-accent"
+          className="block min-h-[52px] w-full resize-y rounded-md border border-border bg-panel py-1.5 pl-2.5 pr-12 text-[13px] text-fg outline-none placeholder:text-muted focus:border-accent"
         />
         <button
           type="submit"
           disabled={!draft.trim() || pending}
           aria-label="Send"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-[#111] outline-none transition-[opacity,background-color] hover:bg-accent-hover focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-40"
+          // Inside the text box, vertically centred (the form's padding is even top and bottom).
+          className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md bg-accent text-[#111] outline-none transition-[opacity,background-color] hover:bg-accent-hover focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-40"
         >
           {pending ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={15} />}
         </button>

@@ -5,7 +5,7 @@ import { Braces, ChevronDown, List, LoaderCircle, Plus, Redo2, RefreshCw, Sparkl
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
 import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
-import EditablePreview, { INLINE_FRAME_HEIGHT } from "./EditablePreview";
+import EditablePreview, { INLINE_FRAME_HEIGHT, INLINE_FRAME_WIDTH } from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
 
@@ -47,11 +47,40 @@ export default function DrawSection(props: {
     );
   };
 
+  const switcher = (
+    <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
+      {(
+        [
+          ...(aiPanel ? ([["ai", "AI", Sparkles]] as const) : []),
+          ["rows", "Rows", List],
+          ["json", "JSON", Braces],
+        ] as const
+      ).map(([m, label, Icon]) => (
+        <button
+          key={m}
+          type="button"
+          aria-pressed={mode === m}
+          onClick={() => setMode(m)}
+          className={`inline-flex items-center gap-1.5 rounded px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
+            mode === m ? "bg-panel-hover text-fg" : "text-muted hover:text-fg"
+          }`}
+        >
+          <Icon size={13} aria-hidden /> {label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6 min-w-0 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5 xl:flex-row xl:items-start">
+    // On xl the two columns line up: each has a 28px header row and a 12px gap, then the chat
+    // (or rows/JSON) on the left and the preview on the right, the chat as tall as the preview.
+    <div
+      className="flex flex-col gap-6 min-w-0 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5 xl:flex-row xl:items-start"
+      style={{ "--preview-w": `${INLINE_FRAME_WIDTH}px`, "--preview-h": `${INLINE_FRAME_HEIGHT}px` } as CSSProperties}
+    >
       <section className="min-w-0 flex-1" aria-label="Draw commands">
-        <div className={`flex items-center justify-between gap-3 xl:mb-3 ${collapsed ? "" : "mb-3"}`}>
-          <h2 className="min-w-0 text-[14px] font-medium">
+        <div className={`flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 xl:mb-3 ${collapsed ? "" : "mb-3"}`}>
+          <h2 className="mr-auto min-w-0 text-[14px] font-medium">
             <button
               type="button"
               onClick={() => setCollapsed((c) => !c)}
@@ -70,39 +99,9 @@ export default function DrawSection(props: {
               </span>
             </button>
           </h2>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" className={iconBtnCls}>
-              <Undo2 size={14} aria-hidden />
-            </button>
-            <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className={iconBtnCls}>
-              <Redo2 size={14} aria-hidden />
-            </button>
-          </div>
-        </div>
-        <div id="draw-commands-body" className={collapsed ? "hidden xl:block" : ""}>
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
-            {(
-              [
-                ...(aiPanel ? ([["ai", "AI", Sparkles]] as const) : []),
-                ["rows", "Rows", List],
-                ["json", "JSON", Braces],
-              ] as const
-            ).map(([m, label, Icon]) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={mode === m}
-                onClick={() => setMode(m)}
-                className={`inline-flex items-center gap-1.5 rounded px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
-                  mode === m ? "bg-panel-hover text-fg" : "text-muted hover:text-fg"
-                }`}
-              >
-                <Icon size={13} aria-hidden /> {label}
-              </button>
-            ))}
-          </div>
-          <AiHelperButton
+          <div className={`items-center gap-2 ${collapsed ? "hidden xl:flex" : "flex"}`}>
+            {switcher}
+            <AiHelperButton
               buildSkill={() => buildDrawSkill(vars)}
               title="AI helper: design the screen"
               fileName="SKILL.md"
@@ -112,60 +111,60 @@ export default function DrawSection(props: {
                 </>
               }
             />
+          </div>
         </div>
-        {mode === "rows" && (
-          <div className="mb-3 flex items-center gap-2">
-            <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="min-w-0 flex-1" />
-            <button type="button" onClick={add} className={`${btnCls} shrink-0`}>
-              <Plus size={14} className="text-accent" aria-hidden /> Add row
-            </button>
-          </div>
-        )}
-        {mode === "ai" ? (
-          // On xl the chat is exactly as tall as the preview frame beside it.
-          <div
-            className="flex flex-col xl:h-[var(--preview-h)] [&>*]:min-h-0 [&>*]:flex-1"
-            style={{ "--preview-h": `${INLINE_FRAME_HEIGHT}px` } as CSSProperties}
-          >
-            {aiPanel}
-          </div>
-        ) : mode === "rows" ? (
-          <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
-        ) : (
-          <DrawJsonEditor rows={rows} onChange={onChange} />
-        )}
+        <div id="draw-commands-body" className={collapsed ? "hidden xl:block" : ""}>
+          {mode === "rows" && (
+            <div className="mb-3 flex items-center gap-2">
+              <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="min-w-0 flex-1" />
+              <button type="button" onClick={add} className={`${btnCls} shrink-0`}>
+                <Plus size={14} className="text-accent" aria-hidden /> Add row
+              </button>
+            </div>
+          )}
+          {mode === "ai" ? (
+            <div className="flex flex-col xl:h-[var(--preview-h)] [&>*]:min-h-0 [&>*]:flex-1">{aiPanel}</div>
+          ) : mode === "rows" ? (
+            <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
+          ) : (
+            <DrawJsonEditor rows={rows} onChange={onChange} />
+          )}
         </div>
       </section>
 
-      <aside className="flex w-full min-w-0 shrink-0 flex-col gap-3 xl:sticky xl:top-4 xl:w-auto" aria-label="Preview">
-        {/* Same height as the "Draw" header row and the same gap below it, so the preview's top
-            lines up with the AI/Rows/JSON switcher. */}
-        <div className="flex h-7 items-center justify-end gap-3">
-          {varsError && (
-            <span className="min-w-0 truncate text-[12px] text-red-300" title={varsError}>
-              Data failed; variables are empty in the preview.
-            </span>
-          )}
-          <button type="button" onClick={onRefreshData} disabled={refreshing} className={btnCls}>
-            {refreshing ? (
-              <LoaderCircle size={14} className="animate-spin text-muted" aria-hidden />
-            ) : (
-              <RefreshCw size={14} className="text-muted" aria-hidden />
-            )}
-            {refreshing ? "Running…" : "Refresh data"}
-          </button>
-        </div>
-
-        <div className="flex min-w-0 flex-col items-center">
-          <EditablePreview
-            rows={rows}
-            ops={ops}
-            rowIds={rowIds}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}
-          />
-        </div>
+      {/* Exactly the preview frame's width on xl, so the toolbar's right edge meets the preview's. */}
+      <aside className="flex w-full min-w-0 shrink-0 flex-col items-center xl:sticky xl:top-4 xl:w-[var(--preview-w)]" aria-label="Preview">
+        <EditablePreview
+          rows={rows}
+          ops={ops}
+          rowIds={rowIds}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}
+          toolbarEnd={
+            <>
+              <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" className={iconBtnCls}>
+                <Undo2 size={14} aria-hidden />
+              </button>
+              <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className={iconBtnCls}>
+                <Redo2 size={14} aria-hidden />
+              </button>
+              <button type="button" onClick={onRefreshData} disabled={refreshing} className={btnCls}>
+                {refreshing ? (
+                  <LoaderCircle size={14} className="animate-spin text-muted" aria-hidden />
+                ) : (
+                  <RefreshCw size={14} className="text-muted" aria-hidden />
+                )}
+                {refreshing ? "Running…" : "Refresh data"}
+              </button>
+            </>
+          }
+        />
+        {varsError && (
+          <p className="mt-1 max-w-full truncate text-[12px] text-red-300" title={varsError}>
+            Data failed; variables are empty in the preview.
+          </p>
+        )}
       </aside>
     </div>
   );

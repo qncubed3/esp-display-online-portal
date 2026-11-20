@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type DrawRow, type WireOp } from "@/lib/draw/ops";
@@ -20,7 +20,8 @@ type Box = { x: number; y: number; w: number; h: number };
 
 /** Preview scale in the Draw tab (outside full screen). */
 export const INLINE_SCALE = 1.75;
-/** Height of the inline preview's device frame: screen + p-3 padding + 1px borders. */
+/** Size of the inline preview's device frame: screen + p-3 padding + 1px borders. */
+export const INLINE_FRAME_WIDTH = SCREEN_WIDTH * INLINE_SCALE + 26;
 export const INLINE_FRAME_HEIGHT = SCREEN_HEIGHT * INLINE_SCALE + 26;
 
 const isFullScreen = (b: Box) => b.x <= 0 && b.y <= 0 && b.x + b.w >= SCREEN_WIDTH && b.y + b.h >= SCREEN_HEIGHT;
@@ -59,6 +60,7 @@ export default function EditablePreview({
   selectedId,
   onSelect,
   onRowChange,
+  toolbarEnd,
 }: {
   rows: DrawRow[];
   ops: WireOp[];
@@ -67,6 +69,8 @@ export default function EditablePreview({
   selectedId: string | null;
   onSelect(id: string | null): void;
   onRowChange(row: DrawRow): void;
+  /** Extra buttons at the right of the toolbar above the preview (after Full screen). */
+  toolbarEnd?: ReactNode;
 }) {
   const rowById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
   const bounds = useMemo(() => opBounds(ops), [ops]);
@@ -305,7 +309,7 @@ export default function EditablePreview({
 
   const hint = selRow
     ? movable
-      ? "Drag to move · grips or edges to resize · arrow keys to nudge (Shift ×10)"
+      ? "Drag to move · grips resize · arrows nudge (Shift ×10)"
       : selRow.op === "fillScreen"
         ? "Fill screen covers the whole screen"
         : "Uses {variables} for its position, so it can't be dragged"
@@ -331,25 +335,32 @@ export default function EditablePreview({
         onKeyDown={onKeyDown}
         cursor={cursor || "crosshair"}
       />
-      <div className="mt-1 flex flex-wrap items-center justify-center gap-2" style={{ cursor: "default" }}>
-        <p className={`text-center text-[12px] ${full ? "text-[#a0a0a0]" : "text-muted"}`}>{hint}</p>
-        {!full && (
-          <button
-            type="button"
-            onClick={() => setFull(true)}
-            title="Full screen"
-            aria-label="Edit in full screen"
-            className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[#2e2e2e] bg-[#1a1a1a] px-1.5 text-[12px] text-[#a0a0a0] hover:bg-[#262626] hover:text-white"
-          >
-            <Maximize2 size={12} /> Full screen
-          </button>
-        )}
-      </div>
+      {full && <p className="mt-1 text-center text-[12px] text-[#a0a0a0]">{hint}</p>}
+    </div>
+  );
+
+  // Inline, the hint and buttons sit in a toolbar above the preview (outside the pointer handlers).
+  const toolbar = (
+    <div className="mb-3 flex h-7 w-full min-w-0 items-center gap-1.5">
+      <p className="mr-auto min-w-0 truncate text-[12px] text-muted" title={hint}>
+        {hint}
+      </p>
+      <button
+        type="button"
+        onClick={() => setFull(true)}
+        title="Full screen"
+        aria-label="Edit in full screen"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-hover text-fg outline-none transition-colors hover:border-border-strong hover:bg-[#2a2a2a] focus-visible:ring-1 focus-visible:ring-accent"
+      >
+        <Maximize2 size={14} aria-hidden />
+      </button>
+      {toolbarEnd}
     </div>
   );
 
   return (
-    <div className="relative">
+    <div className="relative flex w-full min-w-0 flex-col items-center">
+      {toolbar}
       {!full && editor}
       {full && (
         <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed border-[#2e2e2e] text-[12px] text-muted">
