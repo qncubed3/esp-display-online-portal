@@ -1,7 +1,6 @@
 import AppShell from "@/components/layout/AppShell";
 import OpsReference from "@/components/docs/OpsReference";
 import { B, Code, DocSection, H3, List, Note, P, Pre, Table } from "@/components/docs/Prose";
-import { requireUser } from "@/lib/auth";
 import { DATUMS, OP_BY_NAME, SCREEN_HEIGHT, SCREEN_WIDTH, SWATCHES } from "@/lib/draw/ops";
 
 export const metadata = { title: "Docs · ESP Display Portal" };
@@ -73,11 +72,10 @@ const DRAW_EXAMPLE = `[
   ["drawString", "{temp}", 160, 120, 4]
 ]`;
 
-export default async function DocsPage() {
-  const { user } = await requireUser();
+export default function DocsPage() {
 
   return (
-    <AppShell email={user.email ?? ""} crumbs={[{ label: "Docs" }]}>
+    <AppShell crumbs={[{ label: "Docs" }]}>
       <div className="mx-auto flex max-w-6xl gap-10 px-6 py-8">
         <nav aria-label="On this page" className="sticky top-8 hidden w-44 shrink-0 self-start lg:block">
           <p className="mb-2 text-[12px] font-medium text-muted">On this page</p>

@@ -3,15 +3,13 @@ import AppShell from "@/components/layout/AppShell";
 import DevicePreview from "@/components/draw/DevicePreview";
 import UseTemplateButton from "@/components/templates/UseTemplateButton";
 import { Badge } from "@/components/ui/Badge";
-import { requireUser } from "@/lib/auth";
 import { toWireOps } from "@/lib/draw/ops";
 import { TEMPLATES } from "@/lib/templates/catalog";
 
-export default async function TemplatesPage() {
-  const { user } = await requireUser();
+export default function TemplatesPage() {
 
   return (
-    <AppShell email={user.email ?? ""} crumbs={[{ label: "Templates" }]}>
+    <AppShell crumbs={[{ label: "Templates" }]}>
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="mb-6">
           <h1 className="flex items-center gap-2 text-xl font-medium">

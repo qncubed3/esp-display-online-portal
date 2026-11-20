@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { Users } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import SharedServiceCard, { type SharedService } from "@/components/shared/SharedServiceCard";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import { requireUser } from "@/lib/auth";
 import { markNotificationsSeen } from "@/lib/sharing/actions";
 
@@ -13,7 +15,20 @@ type Row = {
     | null;
 };
 
-export default async function SharedPage() {
+export default function SharedPage() {
+  return (
+    <AppShell crumbs={[{ label: "Shared with me" }]}>
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <h1 className="mb-6 text-xl font-medium">Shared with me</h1>
+        <Suspense fallback={<CardGridSkeleton />}>
+          <SharedList />
+        </Suspense>
+      </div>
+    </AppShell>
+  );
+}
+
+async function SharedList() {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("service_members")
@@ -46,10 +61,7 @@ export default async function SharedPage() {
   }
 
   return (
-    <AppShell email={user.email ?? ""} crumbs={[{ label: "Shared with me" }]}>
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="mb-6 text-xl font-medium">Shared with me</h1>
-
+    <>
         {error && (
           <p className="mb-4 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-[#ff8a8e]">
             Could not load shared services: {error.message}
@@ -74,7 +86,6 @@ export default async function SharedPage() {
             ))}
           </ul>
         )}
-      </div>
-    </AppShell>
+    </>
   );
 }

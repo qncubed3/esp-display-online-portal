@@ -1,25 +1,35 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { ChevronRight, LogOut, Monitor } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import SidebarNav from "@/components/layout/SidebarNav";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { createClient } from "@/lib/supabase/server";
 
 export interface Crumb {
   label: string;
   href?: string;
 }
 
+// Streams in after the shell, so no page has to wait on auth before rendering.
+async function SignedInEmail() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const email = typeof data?.claims?.email === "string" ? data.claims.email : "";
+  return (
+    <p className="mb-2 truncate text-[12px] text-muted" title={email}>
+      {email}
+    </p>
+  );
+}
+
 // Signed-in page chrome: narrow left sidebar + top bar with breadcrumbs.
 export default function AppShell({
-  email,
   crumbs,
   actions,
   children,
 }: {
-  /** Undefined while loading (route loading.tsx files): shows a placeholder. */
-  email?: string;
   crumbs: Crumb[];
   actions?: ReactNode;
   children: ReactNode;
@@ -37,13 +47,9 @@ export default function AppShell({
         <SidebarNav />
 
         <div className="border-t border-border p-3">
-          {email === undefined ? (
-            <Skeleton className="mb-3 mt-1 w-32" />
-          ) : (
-            <p className="mb-2 truncate text-[12px] text-muted" title={email}>
-              {email}
-            </p>
-          )}
+          <Suspense fallback={<Skeleton className="mb-3 mt-1 w-32" />}>
+            <SignedInEmail />
+          </Suspense>
           <form action={signOut}>
             <button
               type="submit"
