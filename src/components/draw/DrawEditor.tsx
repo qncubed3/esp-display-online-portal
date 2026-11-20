@@ -594,7 +594,7 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
                   </button>
                   <button
                     type="button"
-                    className={`${iconBtnCls} hover:text-red-400`}
+                    className={`${iconBtnCls} hover:bg-red-500/10`}
                     aria-label={`Delete row ${i + 1}`}
                     title="Delete"
                     onClick={(e) => {
@@ -602,7 +602,7 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
                       remove(i);
                     }}
                   >
-                    <Trash2 size={14} aria-hidden />
+                    <Trash2 size={14} aria-hidden className="text-red-400" />
                   </button>
                 </div>
                 {/* Drag handle + row number. Only this arms the card's `draggable`, so inputs keep normal
