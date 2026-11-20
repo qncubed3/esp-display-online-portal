@@ -3,6 +3,7 @@
 // (the same midpoint/Bresenham algorithms the library uses) so the preview
 // looks like the device: no anti-aliasing, colours quantised to RGB565.
 
+import { FONT2, FONT4, GLCD } from "./fonts";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type WireOp } from "./ops";
 
 type Datum = "TL" | "TC" | "TR" | "ML" | "MC" | "MR" | "BL" | "BC" | "BR";
@@ -14,13 +15,67 @@ interface TextState {
   datum: Datum;
 }
 
-// Font metrics at size 1. Font 1 is the 6×8 GLCD cell; 2 and 4 approximate the
-// proportional fonts' heights (16px and 26px).
-const FONTS: Record<number, { height: number; css: string; mono?: number; baselineOffset: number }> = {
-  1: { height: 8, css: '8px "Courier New", Courier, monospace', mono: 6, baselineOffset: 0 },
-  2: { height: 16, css: "bold 13px Arial, Helvetica, sans-serif", baselineOffset: 2 },
-  4: { height: 26, css: "bold 22px Arial, Helvetica, sans-serif", baselineOffset: 2 },
-};
+// Text uses TFT_eSPI's own bitmap fonts (see fonts.ts), so it matches the device pixel for pixel.
+const decode = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+let glcdBytes: Uint8Array | null = null;
+const glyphCache = new Map<string, Uint8Array>();
+
+const fontHeight = (fontId: number) => (fontId === 2 ? FONT2.height : fontId === 4 ? FONT4.height : 8);
+
+// Characters a font can draw, as codes. Font 1 covers 0–255; fonts 2 and 4 only 32–127 (others are skipped).
+function codes(str: string, fontId: number): number[] {
+  const out: number[] = [];
+  for (const ch of str) {
+    const c = ch.codePointAt(0)!;
+    if (fontId === 2 || fontId === 4 ? c >= 32 && c < 128 : c < 256) out.push(c);
+  }
+  return out;
+}
+
+// Width in pixels at text size 1, like TFT_eSPI's textWidth().
+function textWidth(str: string, fontId: number): number {
+  if (fontId !== 2 && fontId !== 4) return codes(str, 1).length * 6;
+  const widths = fontId === 2 ? FONT2.widths : FONT4.widths;
+  return codes(str, fontId).reduce((w, c) => w + widths[c - 32], 0);
+}
+
+// Calls ink(x, y) for every lit pixel of the string at size 1, relative to its top-left corner.
+function eachInkPixel(str: string, fontId: number, ink: (x: number, y: number) => void) {
+  let left = 0;
+  if (fontId !== 2 && fontId !== 4) {
+    glcdBytes ??= decode(GLCD);
+    for (const c of codes(str, 1)) {
+      for (let col = 0; col < 5; col++) {
+        const bits = glcdBytes[c * 5 + col];
+        for (let row = 0; row < 8; row++) if (bits & (1 << row)) ink(left + col, row);
+      }
+      left += 6;
+    }
+    return;
+  }
+  const font = fontId === 2 ? FONT2 : FONT4;
+  for (const c of codes(str, fontId)) {
+    const w = font.widths[c - 32];
+    const key = `${fontId}:${c}`;
+    let data = glyphCache.get(key);
+    if (!data) glyphCache.set(key, (data = decode(font.glyphs[c - 32])));
+    if (fontId === 2) {
+      const perRow = Math.floor((w + 6) / 8);
+      for (let row = 0; row < font.height; row++)
+        for (let bit = 0; bit < perRow * 8; bit++)
+          if (data[row * perRow + (bit >> 3)] & (0x80 >> (bit & 7))) ink(left + bit, row);
+    } else {
+      // Run-length encoded, row-major over w × height: (b & 0x7f) + 1 pixels, ink when b & 0x80.
+      let p = 0;
+      for (const b of data) {
+        const n = (b & 0x7f) + 1;
+        if (b & 0x80) for (let i = 0; i < n; i++) ink(left + ((p + i) % w), Math.floor((p + i) / w));
+        p += n;
+      }
+    }
+    left += w;
+  }
+}
 
 const DATUMS: Datum[] = ["TL", "TC", "TR", "ML", "MC", "MR", "BL", "BC", "BR"];
 
@@ -62,12 +117,6 @@ const int = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-let scratch: HTMLCanvasElement | null = null;
-function getScratch(): CanvasRenderingContext2D | null {
-  if (typeof document === "undefined") return null;
-  if (!scratch) scratch = document.createElement("canvas");
-  return scratch.getContext("2d", { willReadFrequently: true });
-}
 
 export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): void {
   ctx.imageSmoothingEnabled = false;
@@ -162,42 +211,12 @@ export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): voi
   };
 
   const drawString = (str: string, x: number, y: number, fontId: number) => {
-    const font = FONTS[fontId] ?? FONTS[1];
-    const s = getScratch();
-    if (!s || !str) return;
+    if (!str) return;
     const size = Math.max(1, text.size);
-
-    // Measure at size 1.
-    s.font = font.css;
-    let w1: number;
-    if (font.mono) w1 = str.length * font.mono;
-    else w1 = Math.max(1, Math.ceil(s.measureText(str).width) + 1);
-    const h1 = font.height;
-
-    // Render at size 1 into the scratch canvas, then threshold alpha for hard pixels.
-    const canvas = s.canvas;
-    if (canvas.width < w1 || canvas.height < h1) {
-      canvas.width = Math.max(canvas.width, w1);
-      canvas.height = Math.max(canvas.height, h1);
-    }
-    s.setTransform(1, 0, 0, 1, 0, 0);
-    s.clearRect(0, 0, canvas.width, canvas.height);
-    s.font = font.css;
-    s.textBaseline = "top";
-    s.textAlign = "left";
-    s.fillStyle = text.fg;
-    if (font.mono) {
-      for (let i = 0; i < str.length; i++) s.fillText(str[i], i * font.mono, font.baselineOffset, font.mono);
-    } else {
-      s.fillText(str, 0, font.baselineOffset);
-    }
-    const img = s.getImageData(0, 0, w1, h1);
-    const d = img.data;
-    for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 96 ? 255 : 0;
-    s.putImageData(img, 0, 0);
+    const w = textWidth(str, fontId) * size, h = fontHeight(fontId) * size;
+    if (w <= 0) return;
 
     // Datum → top-left.
-    const w = w1 * size, h = h1 * size;
     const di = Math.max(0, DATUMS.indexOf(text.datum));
     const col = di % 3, row = Math.floor(di / 3);
     const left = x - (col === 1 ? Math.floor(w / 2) : col === 2 ? w : 0);
@@ -207,8 +226,8 @@ export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): voi
       ctx.fillStyle = text.bg;
       ctx.fillRect(left, top, w, h);
     }
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(canvas, 0, 0, w1, h1, left, top, w, h);
+    ctx.fillStyle = text.fg;
+    eachInkPixel(str, fontId, (px, py) => ctx.fillRect(left + px * size, top + py * size, size, size));
     ctx.fillStyle = color;
   };
 
@@ -378,12 +397,8 @@ export function opBounds(ops: WireOp[]): (Box | null)[] {
       }
       case "drawString": {
         const str = String(a[0] ?? "");
-        const font = FONTS[a.length > 3 ? int(a[3]) : 1] ?? FONTS[1];
-        const s = getScratch();
-        if (!str || !s) return null;
-        s.font = font.css;
-        const w1 = font.mono ? str.length * font.mono : Math.max(1, Math.ceil(s.measureText(str).width) + 1);
-        const w = w1 * text.size, h = font.height * text.size;
+        const fontId = a.length > 3 ? int(a[3]) : 1;
+        const w = textWidth(str, fontId) * text.size, h = fontHeight(fontId) * text.size;
         const di = Math.max(0, DATUMS.indexOf(text.datum));
         const col = di % 3, row = Math.floor(di / 3);
         const x = int(a[1]) - (col === 1 ? Math.floor(w / 2) : col === 2 ? w : 0);
