@@ -22,6 +22,11 @@ export default function Loading() {
           <Skeleton className="h-7 w-40 rounded-md" />
         </div>
         <div className="mt-6 flex flex-col gap-5">
+          <div className="-mb-1 flex gap-1 border-b border-border text-[13px]">
+            <span className="-mb-px border-b-2 border-accent px-3 py-2 text-fg">Devices</span>
+            <span className="px-3 py-2 text-muted">Data</span>
+            <span className="px-3 py-2 text-muted">Draw</span>
+          </div>
           <Card title="Devices">
             <div className="space-y-2.5">
               <Skeleton className="w-1/2" />
@@ -30,19 +35,6 @@ export default function Loading() {
           </Card>
           <Card title="Activity">
             <Skeleton className="h-24 w-full rounded-md" />
-          </Card>
-          <Card title="Data">
-            <Skeleton className="h-28 w-full rounded-md" />
-          </Card>
-          <Card title="Draw">
-            <div className="flex flex-col gap-5 xl:flex-row">
-              <div className="flex-1 space-y-2">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <Skeleton key={i} className="h-12 w-full rounded-md" />
-                ))}
-              </div>
-              <Skeleton className="aspect-[4/3] w-full rounded-md xl:w-[480px]" />
-            </div>
           </Card>
         </div>
       </div>

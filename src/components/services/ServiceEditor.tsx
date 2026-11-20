@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { AlertCircle, Check, Loader2, Play, Rocket } from "lucide-react";
+import { AlertCircle, Check, Code2, Cpu, Loader2, Play, Rocket, Shapes } from "lucide-react";
 import { saveService } from "@/app/services/[id]/actions";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import DataEditor from "@/components/data/DataEditor";
@@ -14,6 +14,14 @@ import { buildAiSkill } from "@/lib/ai/skill";
 import type { DrawRow } from "@/lib/draw/ops";
 
 type Vars = Record<string, string | number | boolean>;
+
+const TABS = [
+  { id: "devices", label: "Devices", icon: Cpu },
+  { id: "data", label: "Data", icon: Code2 },
+  { id: "draw", label: "Draw", icon: Shapes },
+] as const;
+type Tab = (typeof TABS)[number]["id"];
+const isTab = (v: string): v is Tab => TABS.some((t) => t.id === v);
 
 function Section({ children }: { children: ReactNode }) {
   return <section className="rounded-md border border-border bg-panel p-5">{children}</section>;
@@ -45,7 +53,21 @@ export default function ServiceEditor({
   const [saved, setSaved] = useState({ code: initialCode, rows: JSON.stringify(initialRows) });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
-  const dirty = code !== saved.code || JSON.stringify(rows) !== saved.rows;
+  const dataDirty = code !== saved.code;
+  const drawDirty = JSON.stringify(rows) !== saved.rows;
+  const dirty = dataDirty || drawDirty;
+
+  // ---------- tabs (remembered in the URL hash, so a reload stays on the same tab)
+
+  const [tab, setTab] = useState<Tab>("devices");
+  useEffect(() => {
+    const fromHash = window.location.hash.slice(1);
+    if (isTab(fromHash)) setTab(fromHash);
+  }, []);
+  const openTab = (t: Tab) => {
+    setTab(t);
+    history.replaceState(null, "", `#${t}`);
+  };
 
   // ---------- preview variables (runs the current, unsaved Data code)
 
@@ -119,13 +141,41 @@ export default function ServiceEditor({
   }, [dirty]);
 
   return (
-    <div className="mt-6 flex flex-col gap-5">
-      <Section>
-        <DevicesPanel serviceId={serviceId} />
-      </Section>
+    // Fills the page height so the Save & deploy bar sits at the bottom even on short tabs.
+    <div className="mt-6 flex flex-1 flex-col gap-5">
+      <div role="tablist" aria-label="Service sections" className="-mb-1 flex gap-1 border-b border-border">
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const active = tab === id;
+          const unsaved = (id === "data" && dataDirty) || (id === "draw" && drawDirty);
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => openTab(id)}
+              className={`-mb-px inline-flex h-9 items-center gap-2 border-b-2 px-3 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
+                active ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"
+              }`}
+            >
+              <Icon size={14} />
+              {label}
+              {unsaved && <span className="h-1.5 w-1.5 rounded-full bg-accent" title="Unsaved changes" />}
+            </button>
+          );
+        })}
+      </div>
 
-      <ActivitySection serviceId={serviceId} />
+      {tab === "devices" && (
+        <>
+          <Section>
+            <DevicesPanel serviceId={serviceId} />
+          </Section>
+          <ActivitySection serviceId={serviceId} />
+        </>
+      )}
 
+      {tab === "data" && (
       <Section>
         <SectionTitle
           title="Data"
@@ -159,17 +209,20 @@ export default function ServiceEditor({
         <DataEditor value={code} onChange={setCode} />
         <VariablesPanel vars={vars} error={varsError} running={refreshing} />
       </Section>
+      )}
 
-      <DrawSection
-        rows={rows}
-        onChange={setRows}
-        vars={vars}
-        varsError={varsError}
-        refreshing={refreshing}
-        onRefreshData={() => void refreshData()}
-      />
+      {tab === "draw" && (
+        <DrawSection
+          rows={rows}
+          onChange={setRows}
+          vars={vars}
+          varsError={varsError}
+          refreshing={refreshing}
+          onRefreshData={() => void refreshData()}
+        />
+      )}
 
-      <div className="sticky bottom-0 z-10 -mx-6 border-t border-border bg-bg/95 px-6 py-3 backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-6 mt-auto border-t border-border bg-bg/95 px-6 py-3 backdrop-blur">
         <div className="flex items-center justify-end gap-3">
           {saveError ? (
             <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] text-[#ff8a8e]">
