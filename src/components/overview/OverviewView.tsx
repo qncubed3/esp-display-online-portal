@@ -9,6 +9,7 @@ import { AlertCircle, Loader2, Users } from "lucide-react";
 import TimeChart, { Legend } from "@/components/stats/TimeChart";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/components/ui/cn";
+import { Skeleton as Pill } from "@/components/ui/Skeleton";
 import { timeAgo } from "@/lib/time";
 import { ACTIVITY_RANGES, type ActivityRange } from "@/lib/polls/types";
 import { POLLS_PER_DEVICE_MONTH_30S, type Overview, type OverviewService } from "@/lib/overview/types";
@@ -163,14 +164,18 @@ export default function OverviewView() {
 function Skeleton() {
   return (
     <div className="space-y-4" aria-hidden>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="flex flex-wrap gap-x-8 gap-y-3">
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="h-[62px] animate-pulse rounded-md border border-border bg-panel" />
+          <div key={i} className="space-y-2">
+            <Pill className="w-16" />
+            <Pill className="h-4 w-10" />
+          </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="h-[186px] animate-pulse rounded-md border border-border bg-panel" />
-        <div className="h-[186px] animate-pulse rounded-md border border-border bg-panel" />
+      <div className="space-y-3">
+        <Pill className="w-2/3" />
+        <Pill className="w-1/2" />
+        <Pill className="w-3/5" />
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { AlertCircle, Loader2, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/components/ui/cn";
+import { Skeleton as Pill } from "@/components/ui/Skeleton";
 import { timeAgo } from "@/lib/time";
 import { ACTIVITY_RANGES, type ActivityRange, type RecentPoll, type ServiceActivity } from "@/lib/polls/types";
 import TimeChart, { Legend } from "./TimeChart";
@@ -211,14 +212,18 @@ export default function ActivitySection({ serviceId }: { serviceId: string }) {
 function Skeleton() {
   return (
     <div className="space-y-4" aria-hidden>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="flex flex-wrap gap-x-8 gap-y-3">
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="h-[62px] animate-pulse rounded-md border border-border bg-bg/60" />
+          <div key={i} className="space-y-2">
+            <Pill className="w-16" />
+            <Pill className="h-4 w-10" />
+          </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="h-[186px] animate-pulse rounded-md border border-border bg-bg/60" />
-        <div className="h-[186px] animate-pulse rounded-md border border-border bg-bg/60" />
+      <div className="space-y-3">
+        <Pill className="w-2/3" />
+        <Pill className="w-1/2" />
+        <Pill className="w-3/5" />
       </div>
     </div>
   );
