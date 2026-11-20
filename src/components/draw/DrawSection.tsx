@@ -131,19 +131,10 @@ export default function DrawSection(props: {
         </div>
       </section>
 
-      <aside className="flex w-full min-w-0 shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">
-        <div className="flex min-w-0 flex-col items-center">
-          <EditablePreview
-            rows={rows}
-            ops={ops}
-            rowIds={rowIds}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}
-          />
-        </div>
-
-        <div className="flex items-center justify-end gap-3">
+      <aside className="flex w-full min-w-0 shrink-0 flex-col gap-3 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">
+        {/* Same height as the "Draw" header row and the same gap below it, so the preview's top
+            lines up with the AI/Rows/JSON switcher. */}
+        <div className="flex h-7 items-center justify-end gap-3">
           {varsError && (
             <span className="min-w-0 truncate text-[12px] text-red-300" title={varsError}>
               Data failed; variables are empty in the preview.
@@ -157,6 +148,17 @@ export default function DrawSection(props: {
             )}
             {refreshing ? "Running…" : "Refresh data"}
           </button>
+        </div>
+
+        <div className="flex min-w-0 flex-col items-center">
+          <EditablePreview
+            rows={rows}
+            ops={ops}
+            rowIds={rowIds}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}
+          />
         </div>
       </aside>
     </div>
