@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { AlertCircle, Check, Code2, Cpu, Loader2, Play, Rocket, Shapes } from "lucide-react";
+import { AlertCircle, Check, Code2, Cpu, LayoutTemplate, Loader2, Play, Rocket, Shapes } from "lucide-react";
 import { saveService } from "@/app/services/[id]/actions";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import DataEditor from "@/components/data/DataEditor";
@@ -9,9 +9,11 @@ import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
 import DrawSection from "@/components/draw/DrawSection";
 import ActivitySection from "@/components/stats/ActivitySection";
+import LoadTemplateDialog, { type LoadMode } from "@/components/templates/LoadTemplateDialog";
 import { Button } from "@/components/ui/Button";
 import { buildAiSkill } from "@/lib/ai/skill";
 import type { DrawRow } from "@/lib/draw/ops";
+import type { Template } from "@/lib/templates/catalog";
 
 type Vars = Record<string, string | number | boolean>;
 
@@ -103,6 +105,21 @@ export default function ServiceEditor({
     void refreshData();
   }, [refreshData]);
 
+  // ---------- load a template (replaces Data and/or Draw locally; nothing is saved until deploy)
+
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const loadTemplate = (t: Template, mode: LoadMode) => {
+    const loadData = mode !== "draw";
+    const loadDraw = mode !== "data";
+    if (loadData) {
+      setCode(t.dataCode);
+      codeRef.current = t.dataCode; // so refreshData below runs the new code before the re-render
+    }
+    if (loadDraw) setRows(t.rows.map((r) => ({ ...r, id: crypto.randomUUID(), args: { ...r.args } })));
+    openTab(loadDraw ? "draw" : "data");
+    void refreshData();
+  };
+
   // ---------- save & deploy
 
   const save = useCallback(() => {
@@ -164,7 +181,21 @@ export default function ServiceEditor({
             </button>
           );
         })}
+        <div className="ml-auto flex items-center pb-1">
+          <Button size="sm" variant="ghost" onClick={() => setTemplateOpen(true)} title="Load a template into this Service">
+            <LayoutTemplate size={14} />
+            Load template
+          </Button>
+        </div>
       </div>
+
+      <LoadTemplateDialog
+        open={templateOpen}
+        onClose={() => setTemplateOpen(false)}
+        hasCode={code.trim() !== ""}
+        rowCount={rows.length}
+        onLoad={loadTemplate}
+      />
 
       {tab === "devices" && (
         <>
