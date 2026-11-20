@@ -142,17 +142,10 @@ export default function ServiceEditor({
                 buildSkill={buildAiSkill}
                 title="AI helper: build this service"
                 fileName="SKILL.md"
-                intro={
-                  <>
-                    Copy this into Claude (or any AI), then tell it your API URLs and what you want shown. It replies with
-                    JavaScript to paste into Data and a JSON array to paste into Draw&apos;s JSON editor.
-                  </>
-                }
                 pasteStep={
                   <>
-                    The AI replies with two code blocks. Copy the <code className="font-mono text-fg">```js</code> block
-                    into the Data editor, and the <code className="font-mono text-fg">```json</code> block into Draw → JSON
-                    view (switch the Draw header to JSON first).
+                    Paste its <code className="font-mono text-fg">```js</code> block into Data and its{" "}
+                    <code className="font-mono text-fg">```json</code> block into Draw → JSON.
                   </>
                 }
               />

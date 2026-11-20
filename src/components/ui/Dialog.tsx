@@ -11,10 +11,11 @@ export interface DialogProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  bodyClassName?: string;
 }
 
 // Native <dialog> modal: Esc and backdrop click close it.
-export function Dialog({ open, onClose, title, children, footer, className }: DialogProps) {
+export function Dialog({ open, onClose, title, children, footer, className, bodyClassName }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export function Dialog({ open, onClose, title, children, footer, className }: Di
           <X size={16} />
         </button>
       </div>
-      <div className="px-4 py-4">{children}</div>
+      <div className={cn("px-4 py-4", bodyClassName)}>{children}</div>
       {footer && <div className="flex justify-end gap-2 border-t border-border px-4 py-3">{footer}</div>}
     </dialog>
   );

@@ -73,11 +73,9 @@ export default function DrawSection(props: {
               buildSkill={() => buildDrawSkill(vars)}
               title="AI helper: design the screen"
               fileName="SKILL.md"
-              intro="Describe the screen you want, then paste the JSON it returns into the JSON editor."
               pasteStep={
                 <>
-                  The AI replies with a <code className="font-mono text-fg">```json</code> code block. Copy it, switch Draw
-                  to <span className="text-fg">JSON</span> view, and paste it there (replacing what&apos;s in the editor).
+                  Paste its <code className="font-mono text-fg">```json</code> block into Draw → JSON.
                 </>
               }
             />
