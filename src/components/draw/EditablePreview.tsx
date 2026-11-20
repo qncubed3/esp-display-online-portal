@@ -9,6 +9,9 @@ import DevicePreview, { screenPoint } from "./DevicePreview";
 const pctX = (x: number) => `${(x / SCREEN_WIDTH) * 100}%`;
 const pctY = (y: number) => `${(y / SCREEN_HEIGHT) * 100}%`;
 
+// How far outside a shape (in CSS pixels on the preview) a click still selects it.
+const HIT_SLOP_CSS = 8;
+
 interface Drag {
   pointerId: number;
   handle: string; // "move" or a handle id from handlesFor
@@ -71,27 +74,40 @@ export default function EditablePreview({
     setDragging(false);
   }
 
-  // Topmost (last drawn) shape under the pointer wins.
-  function onCanvasDown(e: PointerEvent<HTMLCanvasElement>) {
-    if (e.button !== 0) return;
-    const { x, y } = screenPoint(e, e.currentTarget);
-    let hit = -1;
+  // Topmost (last drawn) shape under the pointer wins. Every box is padded by ~HIT_SLOP_CSS screen
+  // pixels so thin lines and small shapes are easy to hit; full-screen ops (Fill screen, a
+  // background rectangle) only count when nothing else is near, or they'd swallow every click.
+  function hitTest(x: number, y: number, slop: number): number {
+    let background = -1;
     for (let i = bounds.length - 1; i >= 0; i--) {
       const b = bounds[i];
-      if (b && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) {
-        hit = i;
-        break;
+      if (!b) continue;
+      if (b.x <= 0 && b.y <= 0 && b.x + b.w >= SCREEN_WIDTH && b.y + b.h >= SCREEN_HEIGHT) {
+        if (background < 0 && x >= 0 && y >= 0 && x < SCREEN_WIDTH && y < SCREEN_HEIGHT) background = i;
+        continue;
       }
+      if (x >= b.x - slop && x < b.x + b.w + slop && y >= b.y - slop && y < b.y + b.h + slop) return i;
     }
+    return background;
+  }
+
+  function onCanvasDown(e: PointerEvent<HTMLCanvasElement>) {
+    if (e.button !== 0) return;
+    const { x, y, unit } = screenPoint(e, e.currentTarget);
+    const hit = hitTest(x, y, Math.max(2, Math.round(HIT_SLOP_CSS * unit)));
     if (hit < 0) {
       onSelect(null);
       return;
     }
     const row = opRows[hit];
     onSelect(row.id);
-    requestAnimationFrame(() =>
-      document.querySelector<HTMLElement>(`[data-row-id="${row.id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
-    );
+    // Bring the row's card to the top of the visible area.
+    requestAnimationFrame(() => {
+      const card = document.querySelector<HTMLElement>(`[data-row-id="${row.id}"]`);
+      if (!card) return;
+      card.style.scrollMarginTop = "16px";
+      card.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
     if (canDrag(row)) begin(e, e.currentTarget, row, "move");
   }
 
@@ -110,13 +126,15 @@ export default function EditablePreview({
     <>
       {/* Dashed selection box; `difference` keeps it visible on any colour. */}
       <div
-        className="absolute border border-dashed border-white mix-blend-difference"
+        className="absolute border-2 border-dashed border-white mix-blend-difference"
         style={{
           left: pctX(selBox.x),
           top: pctY(selBox.y),
-          width: pctX(selBox.w),
-          height: pctY(selBox.h),
-          margin: -1,
+          // 1px gap on every side, then the 2px dashed border.
+          width: `calc(${pctX(selBox.w)} + 2px)`,
+          height: `calc(${pctY(selBox.h)} + 2px)`,
+          margin: -3,
+          boxSizing: "content-box",
         }}
       />
       {handles.map((h) => (
@@ -131,7 +149,7 @@ export default function EditablePreview({
           onPointerMove={move}
           onPointerUp={end}
           onPointerCancel={end}
-          className="pointer-events-auto absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 touch-none border border-black bg-white"
+          className="pointer-events-auto absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 touch-none rounded-[2px] border border-black bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.4)]"
           style={{ left: pctX(h.x + 0.5), top: pctY(h.y + 0.5), cursor: h.cursor }}
           title={h.id === "move" ? undefined : "Drag to reshape"}
         />
