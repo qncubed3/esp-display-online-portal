@@ -13,7 +13,7 @@ export interface CompletionRequest {
 }
 
 export interface LlmProvider {
-  /** Shown in errors and logs, e.g. "gemini (gemini-2.5-flash)". */
+  /** Shown in errors and logs, e.g. "gemini (gemini-3.8-flash)". */
   readonly label: string;
   /** The model's reply as plain text. Throws on HTTP or API errors. */
   complete(req: CompletionRequest): Promise<string>;

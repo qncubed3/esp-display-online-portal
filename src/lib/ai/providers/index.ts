@@ -13,7 +13,7 @@ export { ProviderError } from "./types";
 //   AI_MODEL    = optional; defaults below
 //   AI_BASE_URL = openai only: the API base, e.g. https://api.groq.com/openai/v1
 const DEFAULT_MODELS = {
-  gemini: "gemini-2.5-flash",
+  gemini: "gemini-3.8-flash",
   anthropic: "claude-haiku-5-5",
   openai: "gpt-4o-mini",
 } as const;
