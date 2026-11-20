@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronRight, LayoutGrid, LogOut, Monitor } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 export interface Crumb {
   label: string;
@@ -72,7 +73,10 @@ export default function AppShell({
               </span>
             ))}
           </nav>
-          {actions}
+          <div className="flex shrink-0 items-center gap-3">
+            {actions}
+            <NotificationBell />
+          </div>
         </header>
         <main className="min-h-0 flex-1 overflow-auto">{children}</main>
       </div>

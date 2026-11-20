@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Cpu, Monitor } from "lucide-react";
+import { Cpu, Monitor, Users } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import NewServiceButton from "@/components/services/NewServiceButton";
 import { Badge } from "@/components/ui/Badge";
@@ -9,6 +9,7 @@ import { timeAgo } from "@/lib/time";
 type ServiceCard = {
   id: string;
   name: string;
+  owner_id: string;
   enabled: boolean;
   updated_at: string;
   devices: { count: number }[];
@@ -18,9 +19,18 @@ export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, enabled, updated_at, devices(count)")
+    .select("id, name, owner_id, enabled, updated_at, devices(count)")
     .order("updated_at", { ascending: false });
   const services = (data ?? []) as ServiceCard[];
+  const own = services.filter((s) => s.owner_id === user.id);
+  const shared = services.filter((s) => s.owner_id !== user.id);
+  const sections =
+    own.length && shared.length
+      ? [
+          { title: "Your services", items: own },
+          { title: "Shared with you", items: shared },
+        ]
+      : [{ title: null, items: services }];
 
   return (
     <AppShell email={user.email ?? ""} crumbs={[{ label: "Services" }]}>
@@ -48,31 +58,46 @@ export default async function DashboardPage() {
             <NewServiceButton size="md" />
           </div>
         ) : (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {services.map((s) => {
-              const deviceCount = s.devices?.[0]?.count ?? 0;
-              return (
-                <li key={s.id}>
-                  <Link
-                    href={`/services/${s.id}`}
-                    className="block h-full rounded-md border border-border bg-panel p-4 transition-colors hover:border-border-strong hover:bg-panel-hover"
-                  >
-                    <div className="mb-6 flex items-start justify-between gap-3">
-                      <h3 className="truncate text-sm font-medium">{s.name}</h3>
-                      <Badge variant={s.enabled ? "success" : "neutral"}>{s.enabled ? "Enabled" : "Disabled"}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[12px] text-muted">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Cpu size={13} />
-                        {deviceCount} {deviceCount === 1 ? "device" : "devices"}
-                      </span>
-                      <span title={new Date(s.updated_at).toLocaleString()}>Updated {timeAgo(s.updated_at)}</span>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="space-y-8">
+            {sections.map((section) => (
+              <section key={section.title ?? "all"}>
+                {section.title && <h2 className="mb-3 text-[13px] font-medium text-muted">{section.title}</h2>}
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {section.items.map((s) => {
+                    const deviceCount = s.devices?.[0]?.count ?? 0;
+                    return (
+                      <li key={s.id}>
+                        <Link
+                          href={`/services/${s.id}`}
+                          className="block h-full rounded-md border border-border bg-panel p-4 transition-colors hover:border-border-strong hover:bg-panel-hover"
+                        >
+                          <div className="mb-6 flex items-start justify-between gap-3">
+                            <h3 className="truncate text-sm font-medium">{s.name}</h3>
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {s.owner_id !== user.id && (
+                                <Badge className="gap-1">
+                                  <Users size={11} />
+                                  Shared
+                                </Badge>
+                              )}
+                              <Badge variant={s.enabled ? "success" : "neutral"}>{s.enabled ? "Enabled" : "Disabled"}</Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-[12px] text-muted">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Cpu size={13} />
+                              {deviceCount} {deviceCount === 1 ? "device" : "devices"}
+                            </span>
+                            <span title={new Date(s.updated_at).toLocaleString()}>Updated {timeAgo(s.updated_at)}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
       </div>
     </AppShell>

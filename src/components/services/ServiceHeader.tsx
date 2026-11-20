@@ -8,8 +8,20 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Toggle } from "@/components/ui/Toggle";
+import LeaveServiceButton from "@/components/sharing/LeaveServiceButton";
+import ShareButton from "@/components/sharing/ShareButton";
 
-export default function ServiceHeader({ serviceId, name, enabled }: { serviceId: string; name: string; enabled: boolean }) {
+export default function ServiceHeader({
+  serviceId,
+  name,
+  enabled,
+  isOwner,
+}: {
+  serviceId: string;
+  name: string;
+  enabled: boolean;
+  isOwner: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [isEnabled, setIsEnabled] = useState(enabled);
@@ -110,39 +122,47 @@ export default function ServiceHeader({ serviceId, name, enabled }: { serviceId:
             </button>
           )}
           <Badge variant={isEnabled ? "success" : "neutral"}>{isEnabled ? "Enabled" : "Disabled"}</Badge>
+          {!isOwner && <Badge className="shrink-0">Shared with you</Badge>}
         </div>
 
         <div className="flex items-center gap-4">
           <Toggle checked={isEnabled} onChange={toggle} disabled={pending} label="Enabled" />
-          <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
-            <Trash2 size={14} />
-            Delete
-          </Button>
+          <ShareButton serviceId={serviceId} isOwner={isOwner} />
+          {isOwner ? (
+            <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+              <Trash2 size={14} />
+              Delete
+            </Button>
+          ) : (
+            <LeaveServiceButton serviceId={serviceId} name={name} />
+          )}
         </div>
       </div>
       {error && <p className="mt-2 text-[13px] text-[#ff8a8e]">{error}</p>}
 
-      <Dialog
-        open={confirmDelete}
-        onClose={() => !deleting && setConfirmDelete(false)}
-        title="Delete service"
-        footer={
-          <>
-            <Button size="sm" onClick={() => setConfirmDelete(false)} disabled={deleting}>
-              Cancel
-            </Button>
-            <Button size="sm" variant="danger" onClick={remove} disabled={deleting}>
-              {deleting && <Loader2 size={14} className="animate-spin" />}
-              Delete service
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[13px] text-muted">
-          Delete <span className="text-fg">{name}</span> and all of its devices? Devices using it will stop receiving
-          frames. This can&apos;t be undone.
-        </p>
-      </Dialog>
+      {isOwner && (
+        <Dialog
+          open={confirmDelete}
+          onClose={() => !deleting && setConfirmDelete(false)}
+          title="Delete service"
+          footer={
+            <>
+              <Button size="sm" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button size="sm" variant="danger" onClick={remove} disabled={deleting}>
+                {deleting && <Loader2 size={14} className="animate-spin" />}
+                Delete service
+              </Button>
+            </>
+          }
+        >
+          <p className="text-[13px] text-muted">
+            Delete <span className="text-fg">{name}</span> and all of its devices? Devices using it will stop receiving
+            frames. This can&apos;t be undone.
+          </p>
+        </Dialog>
+      )}
     </div>
   );
 }
