@@ -6,8 +6,14 @@
 //
 // Host functions available to the code:
 //   get(url, { cache?: seconds })  -> parsed JSON (or text), GET only, cached per URL
-//   now(format?)                   -> Australia/Melbourne time, tokens HH mm ss DD MM YYYY ddd
+//   now(format?)                   -> time in opts.timeZone (default Australia/Melbourne),
+//                                     tokens HH mm ss DD MM YYYY ddd
 //   console.log(...)               -> server log
+//   secrets.NAME                   -> frozen object of the Service owner's secrets (opts.secrets);
+//                                     missing names are undefined
+//
+// Secret values are redacted (replaced with "[secret NAME]") from error messages, console
+// output and exported variables, so they never reach the client or device verbatim.
 //
 // Approach: the synchronous QuickJS build (no asyncify). `get` returns a VM promise
 // whose resolution is driven from the host; we pump `runtime.executePendingJobs()`
@@ -21,6 +27,12 @@ export interface DataResult {
   vars: DataVars;
   error?: string;
 }
+export interface RunOptions {
+  /** The Service owner's secrets, exposed to the code as `secrets.NAME`. */
+  secrets?: Record<string, string>;
+  /** IANA timezone used by now(). Invalid or missing falls back to Australia/Melbourne. */
+  timeZone?: string;
+}
 
 const CPU_BUDGET_MS = 2000; // time spent executing JS inside the VM
 const WALL_LIMIT_MS = 15000; // whole run, including network waits
@@ -31,7 +43,8 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_CACHE_S = 30;
 const MAX_CACHE_ENTRIES = 200;
 const MAX_GETS_PER_RUN = 20;
-const TZ = "Australia/Melbourne";
+export const DEFAULT_TIME_ZONE = "Australia/Melbourne";
+const MIN_REDACT_LENGTH = 4; // shorter secret values are too likely to match ordinary text
 
 // ---------- get() with a module-level cache (shared across requests on a warm instance)
 
@@ -104,21 +117,50 @@ async function cachedGet(rawUrl: string, cacheSeconds: number): Promise<string> 
 // ---------- now()
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const dateParts = new Intl.DateTimeFormat("en-AU", {
-  timeZone: TZ,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  weekday: "short",
-  hourCycle: "h23",
-});
+const formatters = new Map<string, Intl.DateTimeFormat>();
 
-export function formatNow(format = "HH:mm", date = new Date()): string {
+function makeFormatter(timeZone: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    weekday: "short",
+    hourCycle: "h23",
+  });
+}
+
+// Formatter for a timezone; an invalid or empty zone falls back to Australia/Melbourne.
+function dateParts(timeZone: string | undefined): Intl.DateTimeFormat {
+  const tz = timeZone?.trim() || DEFAULT_TIME_ZONE;
+  let f = formatters.get(tz);
+  if (!f) {
+    try {
+      f = makeFormatter(tz);
+    } catch {
+      return dateParts(DEFAULT_TIME_ZONE);
+    }
+    if (formatters.size > 100) formatters.clear();
+    formatters.set(tz, f);
+  }
+  return f;
+}
+
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-AU", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function formatNow(format = "HH:mm", date = new Date(), timeZone: string = DEFAULT_TIME_ZONE): string {
   const p: Record<string, string> = {};
-  for (const part of dateParts.formatToParts(date)) p[part.type] = part.value;
+  for (const part of dateParts(timeZone).formatToParts(date)) p[part.type] = part.value;
   const weekday = WEEKDAYS.find((d) => p.weekday?.startsWith(d)) ?? p.weekday ?? "";
   const tokens: Record<string, string> = {
     YYYY: p.year,
@@ -132,6 +174,27 @@ export function formatNow(format = "HH:mm", date = new Date()): string {
   return format.replace(/YYYY|ddd|DD|MM|HH|mm|ss/g, (t) => tokens[t] ?? t);
 }
 
+// ---------- secret redaction
+
+type Redactor = (text: string) => string;
+
+// Replaces every occurrence of a secret value (raw or URL-encoded) with "[secret NAME]".
+function makeRedactor(secrets: Record<string, string>): Redactor {
+  const pairs: [string, string][] = [];
+  for (const [name, value] of Object.entries(secrets)) {
+    if (typeof value !== "string" || value.length < MIN_REDACT_LENGTH) continue;
+    const forms = new Set([value, encodeURIComponent(value), encodeURI(value), new URLSearchParams({ v: value }).toString().slice(2)]);
+    for (const form of forms) pairs.push([form, `[secret ${name}]`]);
+  }
+  if (pairs.length === 0) return (t) => t;
+  pairs.sort((a, b) => b[0].length - a[0].length);
+  return (text) => {
+    let out = text;
+    for (const [needle, label] of pairs) if (out.includes(needle)) out = out.split(needle).join(label);
+    return out;
+  };
+}
+
 // ---------- sandbox
 
 // Runs as a global script before the module, wrapping the raw host functions.
@@ -139,8 +202,14 @@ const PRELUDE = `
 (() => {
   const fetchRaw = globalThis.__fetch;
   const logRaw = globalThis.__log;
+  const secretsJson = globalThis.__secrets;
   delete globalThis.__fetch;
   delete globalThis.__log;
+  delete globalThis.__secrets;
+  const secrets = Object.create(null);
+  const parsed = JSON.parse(secretsJson);
+  for (const k of Object.keys(parsed)) secrets[k] = parsed[k];
+  Object.defineProperty(globalThis, "secrets", { value: Object.freeze(secrets), writable: false, configurable: false, enumerable: false });
   globalThis.get = async (url, opts) => {
     const text = await fetchRaw(String(url), opts && opts.cache != null ? Number(opts.cache) : ${DEFAULT_CACHE_S});
     try { return JSON.parse(text); } catch { return text; }
@@ -162,8 +231,24 @@ function errorMessage(vm: QuickJSContext, handle: QuickJSHandle): string {
   return String(e);
 }
 
-export async function runDataCode(code: string): Promise<DataResult> {
+export async function runDataCode(code: string, opts: RunOptions = {}): Promise<DataResult> {
   if (!code || !code.trim()) return { vars: {} };
+  const secrets: Record<string, string> = {};
+  for (const [k, v] of Object.entries(opts.secrets ?? {})) if (typeof v === "string") secrets[k] = v;
+  const redact = makeRedactor(secrets);
+  const result = await runSandboxed(code, secrets, opts.timeZone, redact);
+  return {
+    vars: Object.fromEntries(Object.entries(result.vars).map(([k, v]) => [k, typeof v === "string" ? redact(v) : v])),
+    ...(result.error !== undefined ? { error: redact(result.error) } : {}),
+  };
+}
+
+async function runSandboxed(
+  code: string,
+  secrets: Record<string, string>,
+  timeZone: string | undefined,
+  redact: Redactor,
+): Promise<DataResult> {
 
   const QuickJS = await getQuickJS();
   const runtime = QuickJS.newRuntime();
@@ -208,7 +293,8 @@ export async function runDataCode(code: string): Promise<DataResult> {
         },
         (err: unknown) => {
           if (!vm.alive || !deferred.alive) return;
-          const e = vm.newError(err instanceof Error ? (err.name === "TimeoutError" ? `get ${url}: timed out` : err.message) : String(err));
+          const raw = err instanceof Error ? (err.name === "TimeoutError" ? `get ${url}: timed out` : err.message) : String(err);
+          const e = vm.newError(redact(raw));
           deferred.reject(e);
           e.dispose();
         },
@@ -221,17 +307,21 @@ export async function runDataCode(code: string): Promise<DataResult> {
     fetchFn.dispose();
 
     const logFn = vm.newFunction("__log", (msgH) => {
-      console.log("[data]", vm.getString(msgH).slice(0, 500));
+      console.log("[data]", redact(vm.getString(msgH)).slice(0, 500));
     });
     vm.setProp(vm.global, "__log", logFn);
     logFn.dispose();
 
     const nowFn = vm.newFunction("now", (fmtH) => {
       const fmt = fmtH && vm.typeof(fmtH) === "string" ? vm.getString(fmtH) : "HH:mm";
-      return vm.newString(formatNow(fmt));
+      return vm.newString(formatNow(fmt, new Date(), timeZone));
     });
     vm.setProp(vm.global, "now", nowFn);
     nowFn.dispose();
+
+    const secretsH = vm.newString(JSON.stringify(secrets));
+    vm.setProp(vm.global, "__secrets", secretsH);
+    secretsH.dispose();
 
     vm.unwrapResult(inVm(() => vm.evalCode(PRELUDE, "prelude.js", { type: "global" }))).dispose();
 

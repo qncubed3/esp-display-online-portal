@@ -19,7 +19,7 @@ const DATA_LIMITS = {
   maxBodyMb: 1,
   defaultCacheS: 30,
   maxGets: 20,
-  timezone: "Australia/Melbourne",
+  defaultTimezone: "Australia/Melbourne",
   pollS: 30,
 };
 
@@ -142,15 +142,18 @@ The code runs as an **ES module** in a QuickJS sandbox on the server (not Node, 
 Available:
 
 - \`await get(url, { cache })\`: HTTP **GET only**. Returns the body parsed as JSON, or the raw text if it is not valid JSON.
-  - Only \`http:\`/\`https:\` URLs. **No custom headers, no POST, no body**: API keys must go in the query string.
+  - Only \`http:\`/\`https:\` URLs. **No custom headers, no POST, no body**: API keys must go in the query string, read from \`secrets\` (below).
   - \`cache\` is in seconds (default **${L.defaultCacheS}**). Responses are cached per URL and shared between runs; \`cache: 0\` always refetches. Use a longer cache for slow-changing data (e.g. \`{ cache: 600 }\` for a daily forecast).
   - **Throws** on a non-2xx status (\`get <url>: HTTP 404\`), after **${L.fetchTimeoutS}s** (\`timed out\`), or if the body is over **${L.maxBodyMb} MB**.
   - At most **${L.maxGets} \`get\` calls per run**. Calls can run in parallel with \`Promise.all\`.
-- \`now(format)\`: current time in **${L.timezone}** as a string. Tokens: \`YYYY\` \`MM\` \`DD\` \`HH\` (00-23) \`mm\` \`ss\` \`ddd\` (Mon, Tue, ...); anything else is kept literally. Default \`"HH:mm"\`. Example: \`now("ddd DD/MM HH:mm")\` gives \`"Fri 20/11 14:05"\`.
+- \`secrets.NAME\`: the Service owner's secrets (API keys), a read-only object of strings. A name the owner has not created is \`undefined\`. Names are uppercase \`A-Z\`, \`0-9\`, \`_\`, starting with a letter (e.g. \`WEATHER_KEY\`). The user creates them on the portal's **Secrets** page. Secret values are redacted from error messages and variables.
+- \`now(format)\`: current time as a string, in the **Service owner's timezone** (set on the portal's **Settings** page; default **${L.defaultTimezone}**). Tokens: \`YYYY\` \`MM\` \`DD\` \`HH\` (00-23) \`mm\` \`ss\` \`ddd\` (Mon, Tue, ...); anything else is kept literally. Default \`"HH:mm"\`. Example: \`now("ddd DD/MM HH:mm")\` gives \`"Fri 20/11 14:05"\`.
 - \`console.log(...)\` (also \`info\`, \`warn\`, \`error\`): server log only.
 - Standard JavaScript built-ins (\`JSON\`, \`Math\`, \`Date\`, \`Array\`, string methods, \`async\`/\`await\`, top-level \`await\`).
 
 Not available: \`fetch\`, \`require\`/\`import\`, \`setTimeout\`/\`setInterval\`, the filesystem, \`process\`, DOM APIs. \`Date\`/\`toLocale*\` may not know the user's timezone: use \`now()\` for display times.
+
+**API keys: never paste a key into the code.** Always read it from \`secrets.NAME\` and build the URL with \`encodeURIComponent(secrets.NAME)\`. Check it exists first and fail with a clear message, e.g. \`if (!secrets.WEATHER_KEY) throw new Error("Add a WEATHER_KEY secret on the Secrets page")\`. If the user pastes a key into the chat, do not put it in the code: tell them to save it as a secret instead.
 
 Output:
 
@@ -165,7 +168,7 @@ Example with a fallback for a flaky API:
 ${FENCE}js
 let price = "--";
 try {
-  const r = await get("https://example.com/api/price?key=abc", { cache: 60 });
+  const r = await get("https://example.com/api/price?key=" + encodeURIComponent(secrets.PRICE_KEY), { cache: 60 });
   price = "$" + r.price.toFixed(2);
 } catch (e) {
   console.log("price failed", e.message);
@@ -180,7 +183,7 @@ ${drawContract("##")}
 
 Before writing code, make sure you know (ask briefly for anything missing):
 
-1. **The APIs**: URLs (with any key in the query string) plus a **sample JSON response** or docs link, so you read the right fields. If an API needs headers or POST, say it cannot be called directly and suggest a proxy or another API.
+1. **The APIs**: URLs plus a **sample JSON response** or docs link, so you read the right fields. For keys, ask only which secret names they have (or will create), never the key itself. If an API needs headers or POST, say it cannot be called directly and suggest a proxy or another API.
 2. **What to show**: which values, labels and units, and roughly where (one big number, a list, a dashboard of cards...).
 3. **Refresh needs**: how fresh each source must be (sets each \`get\`'s \`cache\`) and the API's rate limits.
 4. **Look**: colours or theme, and any conditional styling (e.g. red over a threshold).
@@ -192,7 +195,7 @@ Reply with a one-line summary, then **exactly two fenced code blocks**, in this 
 1. A \`js\` block: the complete Data section. The user pastes it into the Data editor, replacing its contents.
 2. A \`json\` block: the complete Draw ops array in the positional form above, one op per line. The user pastes it into the Draw section's JSON editor, replacing its contents.
 
-After the blocks, list each exported variable and what it holds, one short line each. No comments inside the JSON.
+After the blocks, list each exported variable and what it holds, one short line each. If the code reads any \`secrets.NAME\`, also list each secret the user must create on the **Secrets** page (exact name and what value to paste, e.g. "\`WEATHER_KEY\`: your OpenWeather API key"). No comments inside the JSON.
 
 ## Worked example
 

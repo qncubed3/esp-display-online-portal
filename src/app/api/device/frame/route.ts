@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashKey } from "@/lib/devices/keys";
 import { runDataCode } from "@/lib/data/run";
+import { loadOwnerRunOptions } from "@/lib/secrets/load";
 import { toWireOps, type DrawRow, type Frame, type WireOp } from "@/lib/draw/ops";
 import { readDeviceInfo, recordPoll } from "@/lib/polls/log";
 
@@ -47,7 +48,7 @@ function errorFrameOps(message: string): WireOp[] {
 
 interface DeviceWithService {
   id: string;
-  service: { id: string; enabled: boolean; data_code: string; draw_ops: DrawRow[] | null } | null;
+  service: { id: string; owner_id: string; enabled: boolean; data_code: string; draw_ops: DrawRow[] | null } | null;
 }
 
 interface Served {
@@ -71,7 +72,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("devices")
-    .select("id, service:services!inner(id, enabled, data_code, draw_ops)")
+    .select("id, service:services!inner(id, owner_id, enabled, data_code, draw_ops)")
     .eq("key_hash", hashKey(key))
     .maybeSingle();
   if (error) {
@@ -141,8 +142,10 @@ async function serve(
     };
   }
 
+  // The owner's secrets and timezone, whoever's device this is (they never leave the server).
+  const runOptions = await loadOwnerRunOptions(service.owner_id, supabase);
   const dataStarted = performance.now();
-  const { vars, error: dataError } = await runDataCode(service.data_code ?? "");
+  const { vars, error: dataError } = await runDataCode(service.data_code ?? "", runOptions);
   const dataMs = performance.now() - dataStarted;
   const ops = dataError
     ? errorFrameOps(dataError)
