@@ -5,7 +5,7 @@ import { Braces, List, LoaderCircle, Plus, RefreshCw } from "lucide-react";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
 import { newRow, toWireOps, type DrawRow } from "@/lib/draw/ops";
-import DevicePreview from "./DevicePreview";
+import EditablePreview from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
 
@@ -97,7 +97,13 @@ export default function DrawSection(props: {
 
       <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">
         <div className="flex flex-col items-center">
-          <DevicePreview ops={ops} />
+          <EditablePreview
+            rows={rows}
+            ops={ops}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}
+          />
         </div>
 
         <div className="flex items-center justify-end gap-3">

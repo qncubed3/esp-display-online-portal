@@ -321,3 +321,77 @@ export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): voi
     }
   }
 }
+
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// The screen area each op covers, in the same coordinates renderPreview draws in; null for ops that
+// draw nothing (text state changes, bad values). Used to click shapes on the preview and outline them.
+export function opBounds(ops: WireOp[]): (Box | null)[] {
+  const text = { size: 1, datum: "TL" as Datum };
+  const box = (x: number, y: number, w: number, h: number): Box | null => (w > 0 && h > 0 ? { x, y, w, h } : null);
+  const around = (pts: number[]): Box => {
+    const xs = pts.filter((_, i) => i % 2 === 0), ys = pts.filter((_, i) => i % 2 === 1);
+    const x = Math.min(...xs), y = Math.min(...ys);
+    return { x, y, w: Math.max(...xs) - x + 1, h: Math.max(...ys) - y + 1 };
+  };
+
+  return ops.map((op): Box | null => {
+    if (!Array.isArray(op) || typeof op[0] !== "string") return null;
+    const [name, ...a] = op;
+    switch (name) {
+      case "fillScreen":
+        return box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+      case "drawPixel":
+        return box(int(a[0]), int(a[1]), 1, 1);
+      case "drawLine":
+        return around(a.slice(0, 4).map(int));
+      case "drawFastHLine":
+        return box(int(a[0]), int(a[1]), int(a[2]), 1);
+      case "drawFastVLine":
+        return box(int(a[0]), int(a[1]), 1, int(a[2]));
+      case "drawRect":
+      case "fillRect":
+      case "drawRoundRect":
+      case "fillRoundRect":
+        return box(int(a[0]), int(a[1]), int(a[2]), int(a[3]));
+      case "drawCircle":
+      case "fillCircle": {
+        const r = int(a[2]);
+        return r < 0 ? null : box(int(a[0]) - r, int(a[1]) - r, 2 * r + 1, 2 * r + 1);
+      }
+      case "drawTriangle":
+      case "fillTriangle":
+        return around(a.slice(0, 6).map(int));
+      case "setTextSize":
+        text.size = Math.min(7, Math.max(1, int(a[0]) || 1));
+        return null;
+      case "setTextDatum": {
+        const v = a[0];
+        if (typeof v === "number" && v >= 0 && v < 9) text.datum = DATUMS[v];
+        else if (typeof v === "string" && (DATUMS as string[]).includes(v.toUpperCase())) text.datum = v.toUpperCase() as Datum;
+        return null;
+      }
+      case "drawString": {
+        const str = String(a[0] ?? "");
+        const font = FONTS[a.length > 3 ? int(a[3]) : 1] ?? FONTS[1];
+        const s = getScratch();
+        if (!str || !s) return null;
+        s.font = font.css;
+        const w1 = font.mono ? str.length * font.mono : Math.max(1, Math.ceil(s.measureText(str).width) + 1);
+        const w = w1 * text.size, h = font.height * text.size;
+        const di = Math.max(0, DATUMS.indexOf(text.datum));
+        const col = di % 3, row = Math.floor(di / 3);
+        const x = int(a[1]) - (col === 1 ? Math.floor(w / 2) : col === 2 ? w : 0);
+        const y = int(a[2]) - (row === 1 ? Math.floor(h / 2) : row === 2 ? h : 0);
+        return box(x, y, w, h);
+      }
+      default:
+        return null;
+    }
+  });
+}
