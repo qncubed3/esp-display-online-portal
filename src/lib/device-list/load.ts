@@ -1,5 +1,6 @@
-// Data for the /devices page: every device in every Service the user can access (RLS),
+// Data for the /devices page: the signed-in user's own devices, subscribed to a Service or not,
 // with the latest logged poll and the number of polls in the last 24 hours.
+// Other people's devices on shared Services are listed on those Services' Devices tabs instead.
 
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -15,9 +16,10 @@ const LATEST_COLS = "device_id, at, status, error, fw, rssi, heap, uptime_s";
 interface DeviceDbRow {
   id: string;
   name: string;
-  service_id: string;
+  service_id: string | null;
   last_seen_at: string | null;
   created_at: string;
+  poll_seconds?: number | null; // missing until migration 006 has run
   services: { id: string; name: string; owner_id: string } | null;
 }
 
@@ -113,7 +115,8 @@ async function pollCounts(
 export async function loadDeviceList(supabase: SupabaseClient, userId: string): Promise<DeviceListRow[]> {
   const { data, error } = await supabase
     .from("devices")
-    .select("id, name, service_id, last_seen_at, created_at, services(id, name, owner_id)")
+    .select("*, services(id, name, owner_id)")
+    .eq("owner_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   const devices = (data ?? []) as unknown as DeviceDbRow[];
@@ -132,8 +135,9 @@ export async function loadDeviceList(supabase: SupabaseClient, userId: string): 
         id: d.id,
         name: d.name,
         serviceId: d.service_id,
-        serviceName: d.services?.name ?? "Unknown service",
+        serviceName: d.services?.name ?? null,
         shared: !!d.services && d.services.owner_id !== userId,
+        pollSeconds: d.poll_seconds ?? 30,
         lastSeenAt: d.last_seen_at,
         online: !!d.last_seen_at && now - new Date(d.last_seen_at).getTime() < ONLINE_MS,
         polls24h: counts.get(d.id) ?? 0,

@@ -3,6 +3,7 @@ import AppShell from "@/components/layout/AppShell";
 import DeviceList from "@/components/device-list/DeviceList";
 import { Skeleton, TableRowsSkeleton } from "@/components/ui/Skeleton";
 import { requireUser } from "@/lib/auth";
+import { listSubscribableServices, type SubscribableService } from "@/lib/devices/actions";
 import { loadDeviceList } from "@/lib/device-list/load";
 import type { DeviceListRow } from "@/lib/device-list/types";
 
@@ -31,7 +32,7 @@ function DevicesSkeleton() {
         <Skeleton className="h-8 w-64 rounded-md" />
       </div>
       <div className="rounded-md border border-border bg-panel">
-        <TableRowsSkeleton rows={4} cols={5} />
+        <TableRowsSkeleton rows={4} cols={6} />
       </div>
     </>
   );
@@ -40,9 +41,10 @@ function DevicesSkeleton() {
 async function DevicesContent() {
   const { supabase, user } = await requireUser();
   let devices: DeviceListRow[] = [];
+  let services: SubscribableService[] = [];
   let error: string | null = null;
   try {
-    devices = await loadDeviceList(supabase, user.id);
+    [devices, services] = await Promise.all([loadDeviceList(supabase, user.id), listSubscribableServices()]);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
@@ -63,7 +65,7 @@ async function DevicesContent() {
               <Stat label="Online" value={online} dot="bg-accent" />
               <Stat label="Offline" value={devices.length - online} dot="bg-muted/50" />
             </div>
-            <DeviceList devices={devices} now={Date.now()} />
+            <DeviceList devices={devices} services={services} now={Date.now()} />
           </>
         )}
     </>

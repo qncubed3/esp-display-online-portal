@@ -1,16 +1,25 @@
 "use client";
 
+// A Service's Devices tab: the devices subscribed to this Service. Devices belong to users, so the
+// signed-in user's own devices get full controls and other people's are read-only.
+
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, FileCode2, KeyRound, Loader2, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, FileCode2, KeyRound, Loader2, Plus, Trash2, Users } from "lucide-react";
 import {
   addDevice,
   deleteDevice,
-  listDevices,
+  listMyDevices,
+  listServiceDevices,
+  listSubscribableServices,
   regenerateDeviceKey,
-  setDevicePollSeconds,
-  type DeviceRow,
+  setDeviceService,
+  type MyDeviceRow,
+  type ServiceDeviceRow,
+  type SubscribableService,
 } from "@/lib/devices/actions";
 import SetupFilesDialog from "./SetupFilesDialog";
+import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect, pollLabel } from "./DeviceControls";
 
 const ONLINE_MS = 2 * 60 * 1000;
 
@@ -27,144 +36,61 @@ function relativeTime(iso: string | null, now: number): string {
   return `${d} day${d === 1 ? "" : "s"} ago`;
 }
 
-function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          /* clipboard unavailable */
-        }
-      }}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#2e2e2e] bg-[#232323] px-2 py-1 text-[12px] text-[#ededed] hover:bg-[#2a2a2a]"
-    >
-      {copied ? <Check size={13} className="text-[#3ecf8e]" /> : <Copy size={13} />}
-      {copied ? "Copied" : label}
-    </button>
-  );
-}
-
-function NewKeyCallout({
-  deviceName,
-  keyValue,
-  onClose,
-  onSetupFiles,
+// "Subscribe a device": one of the user's devices that's elsewhere (or nowhere), moved here.
+function SubscribeDevice({
+  devices,
+  busy,
+  onMove,
 }: {
-  deviceName: string;
-  keyValue: string;
-  onClose: () => void;
-  onSetupFiles: () => void;
+  devices: MyDeviceRow[];
+  busy: boolean;
+  onMove: (device: MyDeviceRow) => void;
 }) {
-  // Only rendered after a client-side action, so window is always available here.
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const snippet = `#define SERVICE_URL "${origin}/api/device/frame"\n#define DEVICE_KEY  "${keyValue}"`;
+  const [selected, setSelected] = useState("");
+  const device = devices.find((d) => d.id === selected) ?? null;
+  if (devices.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-[#3ecf8e]/40 bg-[#3ecf8e]/[0.06] p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <p className="font-medium text-[#ededed]">Key for &ldquo;{deviceName}&rdquo;</p>
-          <p className="mt-0.5 text-[#a0a0a0]">Copy it now. It is shown only once and can&apos;t be retrieved later.</p>
-        </div>
-        <button type="button" onClick={onClose} aria-label="Dismiss" className="rounded-md p-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]">
-          <X size={15} />
-        </button>
-      </div>
-
-      <div className="mb-3 flex items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-md border border-[#2e2e2e] bg-[#161616] px-2.5 py-1.5 font-mono text-[12px] text-[#ededed]">
-          {keyValue}
-        </code>
-        <CopyButton text={keyValue} label="Copy key" />
-      </div>
-
-      <div className="relative">
-        <pre className="overflow-x-auto rounded-md border border-[#2e2e2e] bg-[#161616] p-3 pr-24 font-mono text-[12px] leading-relaxed text-[#ededed]">
-          {snippet}
-        </pre>
-        <div className="absolute right-2 top-2">
-          <CopyButton text={snippet} />
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-[#a0a0a0]">Or get the complete ESP32 firmware with this key filled in.</p>
-        <button
-          type="button"
-          onClick={onSetupFiles}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#3ecf8e]/50 bg-[#3ecf8e]/10 px-2.5 py-1.5 font-medium text-[#3ecf8e] hover:bg-[#3ecf8e]/20"
-        >
-          <FileCode2 size={14} /> Setup files
-        </button>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#2e2e2e] bg-[#1c1c1c] px-3 py-2.5">
+      <span className="text-[#a0a0a0]">Subscribe a device</span>
+      <select
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+        aria-label="Device to move to this Service"
+        className="h-7 max-w-[20rem] cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none hover:border-[#3e3e3e] focus:border-[#3e3e3e]"
+      >
+        <option value="">Choose one of your devices…</option>
+        {devices.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name} {d.service_id ? `(on ${d.service_name ?? "another Service"})` : "(no service)"}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={!device || busy}
+        onClick={() => {
+          if (device) {
+            onMove(device);
+            setSelected("");
+          }
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[#2e2e2e] bg-[#232323] px-2.5 py-1 text-[#ededed] hover:bg-[#2a2a2a] disabled:opacity-50"
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />} Move here
+      </button>
+      <span className="text-[12px] text-[#6b6b6b]">Same key, no reflashing: it shows this Service on its next poll.</span>
     </div>
   );
 }
 
-// Seconds between device polls. Each poll is one Vercel function call (Hobby: ~1M/month).
-const POLL_OPTIONS: { value: number; label: string }[] = [
-  { value: 15, label: "Every 15 s" },
-  { value: 30, label: "Every 30 s" },
-  { value: 60, label: "Every minute" },
-  { value: 120, label: "Every 2 min" },
-  { value: 300, label: "Every 5 min" },
-  { value: 600, label: "Every 10 min" },
-  { value: 1800, label: "Every 30 min" },
-  { value: 3600, label: "Every hour" },
-];
-
-// Per-device dropdown. Saves as soon as it changes; the device picks it up on its next poll.
-function PollFrequency({ deviceId, initial }: { deviceId: string; initial: number }) {
-  const [value, setValue] = useState(initial);
-  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const options = POLL_OPTIONS.some((o) => o.value === value) ? POLL_OPTIONS : [...POLL_OPTIONS, { value, label: `Every ${value} s` }];
-
-  async function change(next: number) {
-    const prev = value;
-    setValue(next);
-    setState("saving");
-    try {
-      await setDevicePollSeconds(deviceId, next);
-      setState("saved");
-    } catch {
-      setValue(prev);
-      setState("error");
-    }
-  }
-
-  return (
-    <label className="flex items-center gap-2" title="How often this device asks for a new screen. Each poll counts towards Vercel's free-tier limit.">
-      <span className="sr-only">Poll frequency</span>
-      <select
-        value={value}
-        onChange={(e) => void change(Number(e.target.value))}
-        disabled={state === "saving"}
-        className="h-7 cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none hover:border-[#3e3e3e] focus:border-[#3e3e3e]"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {state === "saving" && <Loader2 size={14} className="animate-spin" aria-label="Saving" />}
-      {state === "saved" && <Check size={14} className="text-[#3ecf8e]" aria-label="Saved" />}
-      {state === "error" && <span className="text-[12px] text-[#ff8a8e]">Couldn&apos;t save</span>}
-    </label>
-  );
-}
-
 export default function DevicesPanel({ serviceId }: { serviceId: string }) {
-  const [devices, setDevices] = useState<DeviceRow[] | null>(null);
+  const [devices, setDevices] = useState<ServiceDeviceRow[] | null>(null);
+  const [mine, setMine] = useState<MyDeviceRow[]>([]);
+  const [services, setServices] = useState<SubscribableService[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null); // device id, or "add"
+  const [busy, setBusy] = useState<string | null>(null); // device id, "add" or "move"
   const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
   const [shownKey, setShownKey] = useState<{ name: string; key: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // Setup files dialog: key is set when opened from the one-time key callout.
@@ -172,7 +98,14 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
 
   const load = useCallback(async () => {
     try {
-      setDevices(await listDevices(serviceId));
+      const [onService, own, subscribable] = await Promise.all([
+        listServiceDevices(serviceId),
+        listMyDevices(),
+        listSubscribableServices(),
+      ]);
+      setDevices(onService);
+      setMine(own);
+      setServices(subscribable);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -202,79 +135,58 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
     }
   }
 
-  async function onAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const name = newName.trim();
-    if (!name) return;
-    const res = await run("add", () => addDevice(serviceId, name));
+  async function onAdd(name: string) {
+    const res = await run("add", () => addDevice(name, serviceId));
     if (res) {
       setShownKey({ name, key: res.key });
       setAdding(false);
-      setNewName("");
       await load();
     }
   }
 
-  async function onRegenerate(d: DeviceRow) {
+  async function onMove(d: MyDeviceRow) {
+    await run("move", () => setDeviceService(d.id, serviceId));
+    await load();
+  }
+
+  async function onRegenerate(d: ServiceDeviceRow) {
     if (!confirm(`Regenerate the key for "${d.name}"? The current key stops working immediately.`)) return;
     const key = await run(d.id, () => regenerateDeviceKey(d.id));
     if (key) setShownKey({ name: d.name, key });
   }
 
-  async function onDelete(d: DeviceRow) {
+  async function onDelete(d: ServiceDeviceRow) {
     if (!confirm(`Delete device "${d.name}"? It will no longer be able to fetch frames.`)) return;
     await run(d.id, () => deleteDevice(d.id));
     await load();
   }
 
+  const movable = mine.filter((d) => d.service_id !== serviceId);
+
   return (
     <section className="space-y-3 text-[13px] text-[#ededed]">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-[14px] font-medium">Devices</h2>
-          <p className="text-[#a0a0a0]">ESP32 screens that show this service.</p>
+          <p className="text-[#a0a0a0]">
+            ESP32 screens subscribed to this service.{" "}
+            <Link href="/devices" className="text-[#3ecf8e] hover:underline">
+              Manage all devices →
+            </Link>
+          </p>
         </div>
         {!adding && (
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#3ecf8e]/50 bg-[#3ecf8e]/10 px-2.5 py-1.5 font-medium text-[#3ecf8e] hover:bg-[#3ecf8e]/20"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#3ecf8e]/50 bg-[#3ecf8e]/10 px-2.5 py-1.5 font-medium text-[#3ecf8e] hover:bg-[#3ecf8e]/20"
           >
             <Plus size={14} /> Add device
           </button>
         )}
       </div>
 
-      {adding && (
-        <form onSubmit={onAdd} className="flex items-center gap-2 rounded-md border border-[#2e2e2e] bg-[#1c1c1c] p-3">
-          <input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Device name, e.g. Kitchen display"
-            maxLength={100}
-            className="min-w-0 flex-1 rounded-md border border-[#2e2e2e] bg-[#161616] px-2.5 py-1.5 text-[#ededed] placeholder:text-[#6b6b6b] focus:border-[#3ecf8e] focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={!newName.trim() || busy === "add"}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#3ecf8e] px-2.5 py-1.5 font-medium text-[#0f0f0f] hover:bg-[#36b87e] disabled:opacity-50"
-          >
-            {busy === "add" && <Loader2 size={13} className="animate-spin" />}
-            Create
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAdding(false);
-              setNewName("");
-            }}
-            className="rounded-md border border-[#2e2e2e] px-2.5 py-1.5 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
-          >
-            Cancel
-          </button>
-        </form>
-      )}
+      {adding && <AddDeviceForm busy={busy === "add"} onSubmit={(name) => void onAdd(name)} onCancel={() => setAdding(false)} />}
 
       {shownKey && (
         <NewKeyCallout
@@ -291,12 +203,15 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
 
       {error && <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-300">{error}</p>}
 
-      <div className="overflow-hidden rounded-md border border-[#2e2e2e] bg-[#1c1c1c]">
+      <SubscribeDevice devices={movable} busy={busy === "move"} onMove={(d) => void onMove(d)} />
+
+      <div className="overflow-x-auto rounded-md border border-[#2e2e2e] bg-[#1c1c1c]">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-[#2e2e2e] text-[12px] text-[#a0a0a0]">
               <th className="px-3 py-2 font-normal">Name</th>
               <th className="px-3 py-2 font-normal">Last seen</th>
+              <th className="px-3 py-2 font-normal">Service</th>
               <th className="px-3 py-2 font-normal">Polls</th>
               <th className="w-px px-3 py-2" />
             </tr>
@@ -304,15 +219,15 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
           <tbody>
             {devices === null && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={5} className="px-3 py-6 text-center text-[#a0a0a0]">
                   <Loader2 size={14} className="inline animate-spin" /> Loading…
                 </td>
               </tr>
             )}
             {devices?.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-[#a0a0a0]">
-                  No devices yet. Add one to get a key for your ESP32.
+                <td colSpan={5} className="px-3 py-6 text-center text-[#a0a0a0]">
+                  No devices on this service yet. Add one, or move one of your devices here.
                 </td>
               </tr>
             )}
@@ -323,49 +238,73 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                   <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-2">
                       <span
-                        className={`h-2 w-2 rounded-full ${online ? "bg-[#3ecf8e] shadow-[0_0_6px_#3ecf8e]" : "bg-[#4a4a4a]"}`}
+                        className={`h-2 w-2 shrink-0 rounded-full ${online ? "bg-[#3ecf8e] shadow-[0_0_6px_#3ecf8e]" : "bg-[#4a4a4a]"}`}
                         title={online ? "Online" : "Offline"}
                       />
                       {d.name}
+                      {!d.mine && (
+                        <span className="inline-flex items-center gap-1 text-[12px] text-[#6b6b6b]" title="Only its owner can change this device">
+                          <Users size={12} /> owned by someone else
+                        </span>
+                      )}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-[#a0a0a0]" title={d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : undefined}>
+                  <td className="whitespace-nowrap px-3 py-2 text-[#a0a0a0]" title={d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : undefined}>
                     {relativeTime(d.last_seen_at, now)}
                   </td>
                   <td className="px-3 py-1.5">
-                    <PollFrequency deviceId={d.id} initial={d.poll_seconds ?? 30} />
+                    {d.mine ? (
+                      <ServiceSelect
+                        key={d.service_id ?? ""}
+                        deviceId={d.id}
+                        initial={d.service_id}
+                        services={services}
+                        onChanged={() => void load()}
+                      />
+                    ) : (
+                      <span className="text-[#a0a0a0]">This service</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-1.5">
+                    {d.mine ? (
+                      <PollFrequency deviceId={d.id} initial={d.poll_seconds ?? 30} />
+                    ) : (
+                      <span className="text-[#a0a0a0]">{pollLabel(d.poll_seconds ?? 30)}</span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-1">
-                      {busy === d.id && <Loader2 size={13} className="animate-spin text-[#a0a0a0]" />}
-                      <button
-                        type="button"
-                        onClick={() => setFilesFor({ name: d.name })}
-                        title="ESP32 firmware files for this device"
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
-                      >
-                        <FileCode2 size={13} /> Setup files
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRegenerate(d)}
-                        disabled={busy !== null}
-                        title="Regenerate key"
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed] disabled:opacity-50"
-                      >
-                        <KeyRound size={13} /> Regenerate key
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(d)}
-                        disabled={busy !== null}
-                        title="Delete device"
-                        aria-label={`Delete ${d.name}`}
-                        className="rounded-md p-1.5 text-[#a0a0a0] hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                    {d.mine && (
+                      <div className="flex items-center justify-end gap-1">
+                        {busy === d.id && <Loader2 size={13} className="animate-spin text-[#a0a0a0]" />}
+                        <button
+                          type="button"
+                          onClick={() => setFilesFor({ name: d.name })}
+                          title="ESP32 firmware files for this device"
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
+                        >
+                          <FileCode2 size={13} /> Setup files
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onRegenerate(d)}
+                          disabled={busy !== null}
+                          title="Regenerate key"
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed] disabled:opacity-50"
+                        >
+                          <KeyRound size={13} /> Regenerate key
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(d)}
+                          disabled={busy !== null}
+                          title="Delete device"
+                          aria-label={`Delete ${d.name}`}
+                          className="rounded-md p-1.5 text-[#a0a0a0] hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

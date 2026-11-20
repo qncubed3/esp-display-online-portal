@@ -148,6 +148,14 @@ export async function loadServiceActivity(
   const recentRows = (recentRes.data ?? []) as FullRow[];
   const { rows, truncated, total } = rangeRes;
 
+  // Polls from devices that have since moved to another Service (or none): look their names up.
+  // RLS hides devices the user can't see any more; those show as "Other device".
+  const unnamed = [...new Set(recentRows.map((r) => r.device_id))].filter((id) => !names.has(id));
+  if (unnamed.length) {
+    const { data: moved } = await supabase.from("devices").select("id, name").in("id", unnamed);
+    for (const d of (moved ?? []) as { id: string; name: string }[]) names.set(d.id, d.name);
+  }
+
   // Latest logged poll per device, for RSSI / heap / fw / uptime. Most come from `recent`;
   // devices that haven't polled lately get one small query each.
   const latest = new Map<string, FullRow>();
@@ -241,7 +249,7 @@ export async function loadServiceActivity(
     id: r.id,
     at: r.at,
     deviceId: r.device_id,
-    deviceName: names.get(r.device_id) ?? "Deleted device",
+    deviceName: names.get(r.device_id) ?? "Other or deleted device",
     status: r.status,
     durationMs: r.duration_ms,
     dataMs: r.data_ms,

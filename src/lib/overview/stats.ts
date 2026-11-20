@@ -32,7 +32,7 @@ const WEEK_MS = 7 * 86400_000;
 
 interface PollRow {
   id: number;
-  service_id: string;
+  service_id: string | null; // null: polled while not subscribed to a Service
   at: string;
   status: number;
   duration_ms: number;
@@ -119,18 +119,22 @@ export async function loadOverview(supabase: SupabaseClient, userId: string, ran
   const firstStart = lastStart - (bucketCount - 1) * bucketMs;
   const fromIso = new Date(firstStart).toISOString();
 
-  const [servicesRes, pollsRes, polls7d] = await Promise.all([
+  const [servicesRes, pollsRes, polls7d, unassignedRes] = await Promise.all([
     supabase.from("services").select("id, name, owner_id, enabled, devices(id, last_seen_at)").order("name"),
     fetchPolls(supabase, fromIso),
     countPolls(supabase, new Date(now - WEEK_MS).toISOString()),
+    // The user's devices with no Service: not under any Service below, but still polling.
+    supabase.from("devices").select("id, last_seen_at").eq("owner_id", userId).is("service_id", null),
   ]);
   if (servicesRes.error) throw new Error(servicesRes.error.message);
+  if (unassignedRes.error) throw new Error(unassignedRes.error.message);
   const serviceRows = (servicesRes.data ?? []) as ServiceRow[];
   const { rows, total, truncated } = pollsRes;
 
   // Group fetched polls by Service.
   const byService = new Map<string, PollRow[]>();
   for (const r of rows) {
+    if (!r.service_id) continue;
     const list = byService.get(r.service_id);
     if (list) list.push(r);
     else byService.set(r.service_id, [r]);
@@ -185,7 +189,10 @@ export async function loadOverview(supabase: SupabaseClient, userId: string, ran
     return { t: firstStart + i * bucketMs, count: g.length, ok, notModified, disabled, error, avgMs: avg(durations), p95Ms: percentile(durations, 95) };
   });
 
-  const allDevices = serviceRows.flatMap((s) => s.devices ?? []);
+  const allDevices = [
+    ...serviceRows.flatMap((s) => s.devices ?? []),
+    ...((unassignedRes.data ?? []) as { id: string; last_seen_at: string | null }[]),
+  ];
   const durations = rows.map((r) => r.duration_ms);
   const estimatedPerMonth = Math.round((polls7d * 30) / 7);
 

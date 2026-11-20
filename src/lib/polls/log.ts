@@ -5,11 +5,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const RETENTION_DAYS = 7;
-const PRUNE_CHANCE = 0.01; // ~1% of polls also delete old rows for their Service
+const PRUNE_CHANCE = 0.01; // ~1% of polls also delete old rows for their device
 
 export interface PollRecord {
   device_id: string;
-  service_id: string;
+  service_id: string | null; // null when the device has no Service
   status: number;
   duration_ms: number;
   data_ms?: number | null;
@@ -76,7 +76,7 @@ export async function recordPoll(supabase: SupabaseClient, row: PollRecord): Pro
       const { error: pruneError } = await supabase
         .from("device_polls")
         .delete()
-        .eq("service_id", row.service_id)
+        .eq("device_id", row.device_id)
         .lt("at", cutoff);
       if (pruneError) console.error("[polls] prune failed", pruneError.message);
     }

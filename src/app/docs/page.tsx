@@ -115,8 +115,9 @@ export default function DocsPage() {
             <P>
               A <B>Service</B> is one screen design. It has two parts: a <B>Data</B> section (JavaScript that fetches and
               formats values) and a <B>Draw</B> section (a list of drawing commands). A <B>Device</B> is an ESP32 with a{" "}
-              {SCREEN_WIDTH}×{SCREEN_HEIGHT} screen, subscribed to exactly one Service by its device key. Many devices can
-              show the same Service.
+              {SCREEN_WIDTH}×{SCREEN_HEIGHT} screen. Devices belong to you, not to a Service: each one subscribes to one
+              Service at a time (or none), and you can switch it on the <B>Devices</B> page without reflashing. Many devices
+              can show the same Service.
             </P>
             <List ordered>
               <li>
@@ -347,7 +348,9 @@ export default function DocsPage() {
             <H3>Add a device</H3>
             <List ordered>
               <li>
-                Open a Service and click <B>Add device</B> in its Devices panel. Give it a name.
+                On the <B>Devices</B> page click <B>Add device</B>, give it a name and optionally pick a Service. (A
+                Service&apos;s Devices tab has an <B>Add device</B> button too, which subscribes the new device to that
+                Service.)
               </li>
               <li>
                 The device key (<Code>esk_…</Code>) is shown <B>once</B>. Copy it now; only its hash is stored. If you lose
@@ -359,7 +362,11 @@ export default function DocsPage() {
               </li>
             </List>
             <P>
-              A device shows as online if it polled in the last 2 minutes. Deleting a device revokes its key.
+              To show a different Service, change the device&apos;s <B>Service</B> dropdown on the Devices page (or use{" "}
+              <B>Move here</B> on a Service&apos;s Devices tab). The key and firmware stay the same; the device gets the new
+              screen on its next poll. A device with no Service shows <B>No service assigned</B>, and deleting a Service
+              leaves its devices unassigned. A device shows as online if it polled in the last 2 minutes. Deleting a device
+              revokes its key.
             </P>
 
             <H3>Flash it with the Arduino IDE</H3>
@@ -423,7 +430,8 @@ export default function DocsPage() {
               rows={[
                 ["Edit Data and Draw, Save & deploy", "Yes", "Yes"],
                 ["Enable / disable, rename", "Yes", "Yes"],
-                ["Add, regenerate and delete devices", "Yes", "Yes"],
+                ["Subscribe their own devices to it", "Yes", "Yes"],
+                ["See the devices subscribed to it", "Yes", "Yes (others' read-only)"],
                 ["Invite or remove members", "Yes", "No"],
                 ["Delete the Service", "Yes", "No (can leave)"],
                 ["Whose secrets the Data code uses", "Owner's", "Owner's"],
@@ -437,7 +445,7 @@ export default function DocsPage() {
               </li>
               <li>
                 <B>Leave</B>: a member clicks <B>Leave</B> in the Service header. The owner can also remove members from the
-                Share dialog.
+                Share dialog. Their devices on that Service then show <B>No service assigned</B> until they pick another.
               </li>
             </List>
           </DocSection>

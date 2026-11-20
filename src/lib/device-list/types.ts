@@ -3,9 +3,10 @@
 export interface DeviceListRow {
   id: string;
   name: string;
-  serviceId: string;
-  serviceName: string;
+  serviceId: string | null; // null: not subscribed to a Service
+  serviceName: string | null; // null when unsubscribed, or the Service is no longer accessible
   shared: boolean; // Service owned by someone else
+  pollSeconds: number;
   lastSeenAt: string | null;
   online: boolean; // seen in the last 2 minutes
   polls24h: number;

@@ -4,6 +4,8 @@
 //   GET /api/device/frame?since=<id> 304 when the frame hasn't changed
 //
 // Responses: 200 Frame JSON | 304 unchanged | 204 service disabled | 401 bad key.
+// A device with no Service (or one its owner can no longer access) gets a 200 "No service assigned"
+// frame, so it can be subscribed to a Service from the portal later without reflashing.
 // Every response that the device should act on carries X-Next-Poll (seconds), and every reply
 // carries X-Poll-Interval: the device's configured interval, which the firmware stores.
 //
@@ -47,8 +49,29 @@ function errorFrameOps(message: string): WireOp[] {
   ];
 }
 
+// Shown by a device that isn't subscribed to a Service. TFT_eSPI's built-in fonts are ASCII only,
+// so the arrow is "->" and other characters in the name become "?".
+function noServiceOps(deviceName: string): WireOp[] {
+  const name = deviceName.replace(/[^ -~]/g, "?").trim();
+  const shortName = name.length > 38 ? name.slice(0, 37) + "~" : name;
+  return [
+    ["fillScreen", "#000000"],
+    ["setTextDatum", "MC"],
+    ["setTextColor", "#FFFF00"],
+    ["setTextSize", 2],
+    ["drawString", "No service assigned", 160, 80, 1],
+    ["setTextSize", 1],
+    ["setTextColor", "#FFFFFF"],
+    ["drawString", "Choose a Service for this device", 160, 122, 2],
+    ["drawString", "in the portal -> Devices", 160, 142, 2],
+    ["drawString", shortName, 160, 180, 2],
+  ];
+}
+
 interface DeviceWithService {
   id: string;
+  name: string;
+  owner_id?: string; // added by migration 007
   poll_seconds?: number | null;
   service: {
     id: string;
@@ -58,6 +81,8 @@ interface DeviceWithService {
     draw_ops: DrawRow[] | null;
   } | null;
 }
+
+type Service = NonNullable<DeviceWithService["service"]>;
 
 interface Served {
   response: Response;
@@ -80,7 +105,8 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("devices")
-    .select("*, service:services!inner(id, owner_id, enabled, data_code, draw_ops)")
+    // Left join: a device with no Service is still a valid device.
+    .select("*, service:services(id, owner_id, enabled, data_code, draw_ops)")
     .eq("key_hash", hashKey(key))
     .maybeSingle();
   if (error) {
@@ -88,11 +114,13 @@ export async function GET(request: Request) {
     return Response.json({ error: "Lookup failed" }, { status: 500, headers: noStore });
   }
   const device = data as unknown as DeviceWithService | null;
-  if (!device || !device.service) return unauthorized("Unknown device key");
+  if (!device) return unauthorized("Unknown device key");
 
   let served: Served;
+  let service: Service | null = null;
   try {
-    served = await serve(supabase, device, device.service, url);
+    service = await accessibleService(supabase, device);
+    served = await serve(supabase, device, service, url);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[device/frame] failed", message);
@@ -113,7 +141,7 @@ export async function GET(request: Request) {
   // Awaited so it completes before the serverless function is frozen. Never throws.
   await recordPoll(supabase, {
     device_id: device.id,
-    service_id: device.service.id,
+    service_id: service?.id ?? null,
     status: served.status,
     duration_ms: performance.now() - started,
     data_ms: served.dataMs,
@@ -126,10 +154,29 @@ export async function GET(request: Request) {
   return served.response;
 }
 
+// The device's Service, or null when it has none. Also null when the Service is someone else's and
+// the device's owner is no longer a member (e.g. removed after subscribing): RLS only checks access
+// when the subscription is written, and this endpoint uses the secret-key client.
+async function accessibleService(
+  supabase: ReturnType<typeof createAdminClient>,
+  device: DeviceWithService,
+): Promise<Service | null> {
+  const service = device.service;
+  if (!service || !device.owner_id || service.owner_id === device.owner_id) return service;
+  const { data, error } = await supabase
+    .from("service_members")
+    .select("service_id")
+    .eq("service_id", service.id)
+    .eq("user_id", device.owner_id)
+    .maybeSingle();
+  if (error) throw new Error(`membership check failed: ${error.message}`);
+  return data ? service : null;
+}
+
 async function serve(
   supabase: ReturnType<typeof createAdminClient>,
   device: DeviceWithService,
-  service: NonNullable<DeviceWithService["service"]>,
+  service: Service | null,
   url: URL,
 ): Promise<Served> {
   // Awaited so it completes before the serverless function is frozen.
@@ -141,7 +188,7 @@ async function serve(
 
   const pollInterval = device.poll_seconds ?? NEXT_POLL_S;
 
-  if (!service.enabled) {
+  if (service && !service.enabled) {
     return {
       response: new Response(null, {
         status: 204,
@@ -155,14 +202,22 @@ async function serve(
     };
   }
 
-  // The owner's secrets and timezone, whoever's device this is (they never leave the server).
-  const runOptions = await loadOwnerRunOptions(service.owner_id, supabase);
-  const dataStarted = performance.now();
-  const { vars, error: dataError } = await runDataCode(service.data_code ?? "", runOptions);
-  const dataMs = performance.now() - dataStarted;
-  const ops = dataError
-    ? errorFrameOps(dataError)
-    : toWireOps(Array.isArray(service.draw_ops) ? service.draw_ops : [], vars);
+  let ops: WireOp[];
+  let dataMs: number | null = null;
+  let dataError: string | undefined;
+  if (!service) {
+    ops = noServiceOps(device.name);
+  } else {
+    // The Service owner's secrets and timezone, whoever's device this is (they never leave the server).
+    const runOptions = await loadOwnerRunOptions(service.owner_id, supabase);
+    const dataStarted = performance.now();
+    const result = await runDataCode(service.data_code ?? "", runOptions);
+    dataMs = performance.now() - dataStarted;
+    dataError = result.error ?? undefined;
+    ops = dataError
+      ? errorFrameOps(dataError)
+      : toWireOps(Array.isArray(service.draw_ops) ? service.draw_ops : [], result.vars);
+  }
 
   const id = createHash("sha256").update(JSON.stringify(ops)).digest("hex").slice(0, 12);
   const headers = {

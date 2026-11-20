@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Cpu, Search, Users } from "lucide-react";
+import { Cpu, ExternalLink, FileCode2, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
+import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/components/ui/cn";
+import { addDevice, deleteDevice, regenerateDeviceKey, type SubscribableService } from "@/lib/devices/actions";
 import { timeAgo } from "@/lib/time";
 import { formatBytes, formatUptime, signalBars, type DeviceListRow } from "@/lib/device-list/types";
 
@@ -17,6 +22,8 @@ const FILTERS: { value: Filter; label: string }[] = [
 ];
 
 const dash = <span className="text-muted/50">—</span>;
+
+const iconButton = "rounded-md p-1.5 text-muted hover:bg-panel-hover hover:text-fg disabled:opacity-50";
 
 function SignalBars({ rssi }: { rssi: number }) {
   const bars = signalBars(rssi);
@@ -46,9 +53,26 @@ function StatusBadge({ status, error }: { status: number; error: string | null }
   );
 }
 
-export default function DeviceList({ devices, now }: { devices: DeviceListRow[]; now: number }) {
+// The signed-in user's devices: add them, choose the Service each one shows, poll frequency, keys.
+// Changing the Service needs no reflashing; the device gets the new screen on its next poll.
+export default function DeviceList({
+  devices,
+  services,
+  now,
+}: {
+  devices: DeviceListRow[];
+  services: SubscribableService[];
+  now: number;
+}) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null); // device id or "add"
+  const [error, setError] = useState<string | null>(null);
+  const [shownKey, setShownKey] = useState<{ name: string; key: string } | null>(null);
+  // Setup files dialog: key is set when opened from the one-time key callout.
+  const [filesFor, setFilesFor] = useState<{ name: string; key?: string } | null>(null);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -58,29 +82,95 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
       if (!q) return true;
       return (
         d.name.toLowerCase().includes(q) ||
-        d.serviceName.toLowerCase().includes(q) ||
+        (d.serviceName ?? "no service").toLowerCase().includes(q) ||
         (d.fw?.toLowerCase().includes(q) ?? false)
       );
     });
   }, [devices, query, filter]);
 
+  async function run<T>(id: string, fn: () => Promise<T>): Promise<T | undefined> {
+    setBusy(id);
+    setError(null);
+    try {
+      return await fn();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onAdd(name: string, serviceId: string | null) {
+    const res = await run("add", () => addDevice(name, serviceId));
+    if (res) {
+      setShownKey({ name, key: res.key });
+      setAdding(false);
+      router.refresh();
+    }
+  }
+
+  async function onRegenerate(d: DeviceListRow) {
+    if (!confirm(`Regenerate the key for "${d.name}"? The current key stops working immediately.`)) return;
+    const key = await run(d.id, () => regenerateDeviceKey(d.id));
+    if (key) setShownKey({ name: d.name, key });
+  }
+
+  async function onDelete(d: DeviceListRow) {
+    if (!confirm(`Delete device "${d.name}"? It will no longer be able to fetch frames.`)) return;
+    await run(d.id, () => deleteDevice(d.id));
+    router.refresh();
+  }
+
+  // Add form, one-time key and errors, above the table (or the empty state).
+  const panels =
+    adding || shownKey || error ? (
+      <div className="mb-3 space-y-3">
+        {adding && (
+          <AddDeviceForm
+            services={services}
+            busy={busy === "add"}
+            onSubmit={(name, serviceId) => void onAdd(name, serviceId)}
+            onCancel={() => setAdding(false)}
+          />
+        )}
+        {shownKey && (
+          <NewKeyCallout
+            deviceName={shownKey.name}
+            keyValue={shownKey.key}
+            onClose={() => setShownKey(null)}
+            onSetupFiles={() => setFilesFor({ name: shownKey.name, key: shownKey.key })}
+          />
+        )}
+        {error && (
+          <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-[#ff8a8e]">{error}</p>
+        )}
+      </div>
+    ) : null;
+
+  const filesDialog = filesFor && (
+    <SetupFilesDialog deviceName={filesFor.name} deviceKey={filesFor.key} onClose={() => setFilesFor(null)} />
+  );
+
   if (devices.length === 0) {
     return (
-      <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-6 py-16 text-center">
-        <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted">
-          <Cpu size={18} />
-        </span>
-        <h2 className="mb-1 text-sm font-medium">No devices yet</h2>
-        <p className="mb-5 max-w-sm text-[13px] text-muted">
-          Devices are added to a Service. Open a Service and use <span className="text-fg">Add device</span> to get a
-          device key for your ESP32.
-        </p>
-        <Link
-          href="/"
-          className="inline-flex h-8 items-center rounded-md border border-accent bg-accent px-3 text-sm font-medium text-[#111] transition-colors hover:border-accent-hover hover:bg-accent-hover"
-        >
-          Go to Services
-        </Link>
+      <div>
+        {panels}
+        {filesDialog}
+        {!adding && (
+          <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-6 py-16 text-center">
+            <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted">
+              <Cpu size={18} />
+            </span>
+            <h2 className="mb-1 text-sm font-medium">No devices yet</h2>
+            <p className="mb-5 max-w-sm text-[13px] text-muted">
+              Add a device to get a key for your ESP32, then choose which Service it shows. You can switch Services any
+              time without reflashing.
+            </p>
+            <Button variant="primary" onClick={() => setAdding(true)}>
+              <Plus size={14} /> Add device
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -90,6 +180,8 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
 
   return (
     <div>
+      {panels}
+      {filesDialog}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-xs">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -118,6 +210,11 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
             </button>
           ))}
         </div>
+        {!adding && (
+          <Button variant="primary" size="sm" className="ml-auto" onClick={() => setAdding(true)}>
+            <Plus size={14} /> Add device
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-md border border-border bg-panel">
@@ -126,6 +223,7 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
             <tr>
               <th className="px-4 py-2 font-normal">Device</th>
               <th className="px-4 py-2 font-normal">Service</th>
+              <th className="px-4 py-2 font-normal">Polls</th>
               <th className="px-4 py-2 font-normal">Last seen</th>
               <th className="px-4 py-2 font-normal">Firmware</th>
               <th className="px-4 py-2 font-normal">WiFi</th>
@@ -133,6 +231,9 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
               <th className="px-4 py-2 text-right font-normal">Uptime</th>
               <th className="px-4 py-2 font-normal">Last status</th>
               <th className="px-4 py-2 text-right font-normal">Polls 24h</th>
+              <th className="w-px px-4 py-2">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -147,17 +248,29 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
                     <span className="truncate font-medium">{d.name}</span>
                   </span>
                 </td>
-                <td className="px-4 py-2.5">
-                  <span className="flex items-center gap-1.5">
-                    <Link href={`/services/${d.serviceId}`} className="truncate text-muted hover:text-fg hover:underline">
-                      {d.serviceName}
-                    </Link>
-                    {d.shared && (
-                      <span title="Shared with you" className="text-muted">
-                        <Users size={12} />
-                      </span>
+                <td className="px-4 py-1.5">
+                  <span className="flex items-center gap-1">
+                    <ServiceSelect
+                      key={d.serviceId ?? ""}
+                      deviceId={d.id}
+                      initial={d.serviceId}
+                      services={services}
+                      onChanged={() => router.refresh()}
+                    />
+                    {d.serviceId && d.serviceName && (
+                      <Link
+                        href={`/services/${d.serviceId}`}
+                        title={`Open ${d.serviceName}${d.shared ? " (shared with you)" : ""}`}
+                        aria-label={`Open ${d.serviceName}`}
+                        className={iconButton}
+                      >
+                        <ExternalLink size={12} />
+                      </Link>
                     )}
                   </span>
+                </td>
+                <td className="whitespace-nowrap px-4 py-1.5">
+                  <PollFrequency key={d.pollSeconds} deviceId={d.id} initial={d.pollSeconds} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-muted">
                   {d.lastSeenAt ? (
@@ -178,11 +291,45 @@ export default function DeviceList({ devices, now }: { devices: DeviceListRow[];
                   {d.lastStatus != null ? <StatusBadge status={d.lastStatus} error={d.lastError} /> : dash}
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{d.polls24h.toLocaleString("en")}</td>
+                <td className="px-4 py-1.5">
+                  <div className="flex items-center justify-end gap-0.5">
+                    {busy === d.id && <Loader2 size={13} className="animate-spin text-muted" />}
+                    <button
+                      type="button"
+                      onClick={() => setFilesFor({ name: d.name })}
+                      title="ESP32 firmware files for this device (paste the key into config.h)"
+                      aria-label={`Setup files for ${d.name}`}
+                      className={iconButton}
+                    >
+                      <FileCode2 size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onRegenerate(d)}
+                      disabled={busy !== null}
+                      title="Regenerate key"
+                      aria-label={`Regenerate key for ${d.name}`}
+                      className={iconButton}
+                    >
+                      <KeyRound size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onDelete(d)}
+                      disabled={busy !== null}
+                      title="Delete device"
+                      aria-label={`Delete ${d.name}`}
+                      className="rounded-md p-1.5 text-muted hover:bg-danger/10 hover:text-[#ff8a8e] disabled:opacity-50"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-[13px] text-muted">
+                <td colSpan={11} className="px-4 py-10 text-center text-[13px] text-muted">
                   No devices match.
                 </td>
               </tr>
