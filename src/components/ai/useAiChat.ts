@@ -71,7 +71,11 @@ export function useAiChat({
           drawError?: string;
           error?: string;
         };
-        if (!res.ok || body.error) throw new Error(body.error ?? `Request failed (HTTP ${res.status})`);
+        if (!res.ok || body.error) {
+          // A bare 504 (no JSON) is the platform's own timeout.
+          const fallback = res.status === 504 ? "The AI took too long to reply. Try again, or ask for a smaller change." : `Request failed (HTTP ${res.status})`;
+          throw new Error(body.error ?? fallback);
+        }
 
         const latest = getState();
         const parsed = body.wire ? wireToRows(body.wire, latest.rows) : undefined;

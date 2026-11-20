@@ -10,6 +10,8 @@ export interface CompletionRequest {
   system: string;
   messages: ChatMessage[];
   maxTokens: number;
+  /** Abort the HTTP request after this long. */
+  timeoutMs: number;
 }
 
 export interface LlmProvider {
@@ -23,26 +25,32 @@ export class ProviderError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    readonly timedOut = false,
   ) {
     super(message);
   }
 }
 
-const TIMEOUT_MS = 60_000;
-
 // POSTs JSON and returns the parsed body, turning non-2xx responses into a ProviderError with
 // the API's own message when it sends one.
-export async function postJson(label: string, url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
+export async function postJson(
+  label: string,
+  url: string,
+  headers: Record<string, string>,
+  body: unknown,
+  timeoutMs: number,
+): Promise<unknown> {
   let res: Response;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
-    throw new ProviderError(`${label}: ${e instanceof Error && e.name === "TimeoutError" ? "timed out" : "request failed"}`);
+    const timedOut = e instanceof Error && e.name === "TimeoutError";
+    throw new ProviderError(`${label}: ${timedOut ? "timed out" : "request failed"}`, undefined, timedOut);
   }
   const json = (await res.json().catch(() => null)) as { error?: { message?: string } | string } | null;
   if (!res.ok) {

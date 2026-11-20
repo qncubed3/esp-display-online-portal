@@ -10,7 +10,12 @@ import type { DrawRow } from "@/lib/draw/ops";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// The model calls share a budget that ends before the platform's limit, so a slow model gives a
+// clear "took too long" error instead of the platform killing the function (a bare 504).
+export const maxDuration = 120;
+const BUDGET_MS = 110_000;
+// Only attempt the Draw JSON repair round with at least this much budget left.
+const MIN_REPAIR_MS = 25_000;
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -81,12 +86,13 @@ export async function POST(request: Request) {
     .slice(-MAX_MESSAGES)
     .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
 
+  const deadline = Date.now() + BUDGET_MS;
   try {
-    let reply = parseReply(await provider.complete({ system, messages: chat, maxTokens: MAX_TOKENS }));
+    let reply = parseReply(await provider.complete({ system, messages: chat, maxTokens: MAX_TOKENS, timeoutMs: BUDGET_MS }));
     let draw = reply.drawText !== undefined ? validateDraw(reply.drawText) : undefined;
 
     // One repair round when the Draw JSON doesn't validate: show the model its error.
-    if (draw && !draw.ok) {
+    if (draw && !draw.ok && deadline - Date.now() > MIN_REPAIR_MS) {
       const retry = parseReply(
         await provider.complete({
           system,
@@ -96,6 +102,7 @@ export async function POST(request: Request) {
             { role: "user", content: `That Draw JSON is invalid: ${draw.error}\nSend the corrected complete json block only.` },
           ],
           maxTokens: MAX_TOKENS,
+          timeoutMs: deadline - Date.now(),
         }),
       );
       if (retry.drawText !== undefined) {
@@ -115,6 +122,9 @@ export async function POST(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
+    if (e instanceof ProviderError && e.timedOut) {
+      return Response.json({ error: "The AI took too long to reply. Try again, or ask for a smaller change." }, { status: 504 });
+    }
     const status = e instanceof ProviderError && e.status === 429 ? 429 : 502;
     const message = e instanceof Error ? e.message : "The AI request failed.";
     return Response.json({ error: status === 429 ? `The AI provider is rate limiting requests. ${message}` : message }, { status });

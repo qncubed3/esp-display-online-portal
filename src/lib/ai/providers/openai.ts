@@ -13,12 +13,13 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     this.label = `${new URL(baseUrl).hostname} (${model})`;
   }
 
-  async complete({ system, messages, maxTokens }: CompletionRequest): Promise<string> {
+  async complete({ system, messages, maxTokens, timeoutMs }: CompletionRequest): Promise<string> {
     const body = (await postJson(
       this.label,
       `${this.baseUrl.replace(/\/+$/, "")}/chat/completions`,
       { Authorization: `Bearer ${this.apiKey}` },
       { model: this.model, max_tokens: maxTokens, messages: [{ role: "system", content: system }, ...messages] },
+      timeoutMs,
     )) as { choices?: { message?: { content?: string } }[] };
     return body.choices?.[0]?.message?.content ?? "";
   }
