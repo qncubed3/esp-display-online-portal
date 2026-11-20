@@ -42,8 +42,13 @@ export default function DrawSection(props: {
   return (
     <div className="flex flex-col gap-6 rounded-md border border-border bg-panel p-5 text-[13px] text-fg xl:flex-row xl:items-start">
       <section className="min-w-0 flex-1" aria-label="Draw commands">
-        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="mb-3 flex items-baseline gap-3">
           <h2 className="text-[14px] font-medium">Draw</h2>
+          <span className="text-muted">
+            {rows.length} {rows.length === 1 ? "command" : "commands"}
+          </span>
+        </div>
+        <div className="mb-3 flex items-center justify-between gap-2">
           <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
             {(
               [
@@ -64,19 +69,7 @@ export default function DrawSection(props: {
               </button>
             ))}
           </div>
-          <span className="text-muted">
-            {rows.length} {rows.length === 1 ? "command" : "commands"}
-          </span>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {mode === "rows" && (
-              <>
-                <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="w-[200px]" />
-                <button type="button" onClick={add} className={btnCls}>
-                  <Plus size={14} className="text-accent" aria-hidden /> Add row
-                </button>
-              </>
-            )}
-            <AiHelperButton
+          <AiHelperButton
               buildSkill={() => buildDrawSkill(vars)}
               title="AI helper: design the screen"
               fileName="SKILL.md"
@@ -88,8 +81,15 @@ export default function DrawSection(props: {
                 </>
               }
             />
-          </div>
         </div>
+        {mode === "rows" && (
+          <div className="mb-3 flex items-center gap-2">
+            <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="min-w-0 flex-1" />
+            <button type="button" onClick={add} className={`${btnCls} shrink-0`}>
+              <Plus size={14} className="text-accent" aria-hidden /> Add row
+            </button>
+          </div>
+        )}
         {mode === "rows" ? (
           <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
         ) : (
