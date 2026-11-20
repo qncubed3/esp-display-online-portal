@@ -2,24 +2,25 @@ import { Code2, Cpu, LayoutTemplate, Plus, Rocket, Shapes, Share2, Trash2 } from
 import AppShell from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  LoadingEnabledToggle,
+  LoadingNameCrumb,
+  LoadingParentCrumb,
+  LoadingTitle,
+} from "@/components/services/ServiceLoadingHeader";
 
 // Shown while the Service loads. Everything that doesn't depend on the Service (buttons, tabs,
-// section titles and descriptions) is the real UI, disabled; only the name and the data are pills.
+// section titles and descriptions) is the real UI, disabled. The name and status come from the link
+// that was clicked (see ServiceLink); only what it didn't know, and the data, are pills.
 export default function Loading() {
   return (
-    <AppShell crumbs={[{ label: "My Services", href: "/" }, { label: "…" }]}>
+    <AppShell crumbs={[{ label: <LoadingParentCrumb /> }, { label: <LoadingNameCrumb /> }]}>
       <div role="status" aria-label="Loading" className="mx-auto flex min-h-full max-w-6xl flex-col px-4 pt-6 md:px-6">
-        {/* Header: name and badge are data; the controls are real but disabled until it loads. */}
+        {/* Header: the controls are real but disabled until it loads. */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Skeleton className="h-4 w-44" />
-            <Skeleton className="h-3 w-14" />
-          </div>
+          <LoadingTitle />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span className="inline-flex items-center gap-2 text-[13px] text-muted">
-              <span className="inline-block h-5 w-9 rounded-full border border-border bg-panel-hover" aria-hidden />
-              Enabled
-            </span>
+            <LoadingEnabledToggle />
             <Button size="sm" disabled>
               <Share2 size={14} />
               Share

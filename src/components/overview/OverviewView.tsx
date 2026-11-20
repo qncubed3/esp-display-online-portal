@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, Loader2, Users } from "lucide-react";
+import ServiceLink from "@/components/services/ServiceLink";
 import TimeChart, { Legend } from "@/components/stats/TimeChart";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/components/ui/cn";
@@ -312,13 +313,13 @@ function ServiceTable({ services, range }: { services: OverviewService[]; range:
                 <tr key={s.id} className="border-b border-border last:border-0 hover:bg-panel-hover">
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className="flex items-center gap-2">
-                      <Link
-                        href={`/services/${s.id}`}
+                      <ServiceLink
+                        service={{ id: s.id, name: s.name, enabled: s.enabled, shared: s.shared }}
                         className="max-w-[200px] truncate text-fg hover:text-accent hover:underline"
                         title={s.name}
                       >
                         {s.name}
-                      </Link>
+                      </ServiceLink>
                       {!s.enabled && <Badge>Disabled</Badge>}
                       {s.shared && (
                         <Badge className="gap-1" title="Shared with you" aria-label="Shared with you">

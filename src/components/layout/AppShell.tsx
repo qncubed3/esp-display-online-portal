@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/server";
 
 export interface Crumb {
-  label: string;
+  label: ReactNode;
   href?: string;
 }
 

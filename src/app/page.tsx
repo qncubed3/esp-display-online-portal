@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Cpu, Monitor } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import NewServiceButton from "@/components/services/NewServiceButton";
+import ServiceLink from "@/components/services/ServiceLink";
 import { Badge } from "@/components/ui/Badge";
 import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import { requireUser } from "@/lib/auth";
@@ -94,8 +95,8 @@ async function ServiceGrid() {
         const deviceCount = s.devices?.[0]?.count ?? 0;
         return (
           <li key={s.id}>
-            <Link
-              href={`/services/${s.id}`}
+            <ServiceLink
+              service={{ id: s.id, name: s.name, enabled: s.enabled }}
               className="block h-full rounded-md border border-border bg-panel p-4 transition-colors hover:border-border-strong hover:bg-panel-hover"
             >
               <div className="mb-6 flex items-start justify-between gap-3">
@@ -109,7 +110,7 @@ async function ServiceGrid() {
                 </span>
                 <span title={new Date(s.updated_at).toLocaleString()}>Updated {timeAgo(s.updated_at)}</span>
               </div>
-            </Link>
+            </ServiceLink>
           </li>
         );
       })}

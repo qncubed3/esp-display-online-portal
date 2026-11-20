@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import ServiceLink from "@/components/services/ServiceLink";
 import { Bell, Loader2 } from "lucide-react";
 import { listNotifications, markNotificationsSeen, type NotificationRow } from "@/lib/sharing/actions";
 import { cn } from "@/components/ui/cn";
@@ -100,8 +100,8 @@ export default function NotificationBell() {
             <ul className="max-h-96 divide-y divide-border overflow-auto">
               {items.map((n) => (
                 <li key={n.service_id}>
-                  <Link
-                    href={`/services/${n.service_id}`}
+                  <ServiceLink
+                    service={{ id: n.service_id, name: n.service_name, shared: true }}
                     onClick={close}
                     className="flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-panel-hover"
                   >
@@ -117,7 +117,7 @@ export default function NotificationBell() {
                         {timeAgo(n.created_at)}
                       </span>
                     </span>
-                  </Link>
+                  </ServiceLink>
                 </li>
               ))}
             </ul>

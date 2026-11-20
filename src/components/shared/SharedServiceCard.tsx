@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Cpu } from "lucide-react";
+import ServiceLink from "@/components/services/ServiceLink";
 import LeaveServiceButton from "@/components/sharing/LeaveServiceButton";
 import { Badge } from "@/components/ui/Badge";
 import { timeAgo } from "@/lib/time";
@@ -20,9 +20,12 @@ export default function SharedServiceCard({ service: s }: { service: SharedServi
     <div className="relative h-full rounded-md border border-border bg-panel p-4 transition-colors hover:border-border-strong hover:bg-panel-hover">
       <div className="mb-6 flex items-start justify-between gap-3">
         <h3 className="min-w-0 truncate text-sm font-medium">
-          <Link href={`/services/${s.id}`} className="after:absolute after:inset-0 after:rounded-md">
+          <ServiceLink
+            service={{ id: s.id, name: s.name, enabled: s.enabled, shared: true }}
+            className="after:absolute after:inset-0 after:rounded-md"
+          >
             {s.name}
-          </Link>
+          </ServiceLink>
         </h3>
         <div className="flex shrink-0 items-center gap-1.5">
           {s.isNew && <Badge variant="success">New</Badge>}

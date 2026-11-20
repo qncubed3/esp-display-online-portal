@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import ServiceLink from "@/components/services/ServiceLink";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Cpu, ExternalLink, FileCode2, Info, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
@@ -329,14 +329,14 @@ export default function DeviceList({
                       onChanged={() => router.refresh()}
                     />
                     {d.serviceId && d.serviceName ? (
-                      <Link
-                        href={`/services/${d.serviceId}`}
+                      <ServiceLink
+                        service={{ id: d.serviceId, name: d.serviceName, shared: d.shared }}
                         title={`Open ${d.serviceName}${d.shared ? " (shared with you)" : ""}`}
                         aria-label={`Open ${d.serviceName}`}
                         className={iconButton}
                       >
                         <ExternalLink size={12} />
-                      </Link>
+                      </ServiceLink>
                     ) : (
                       // Same width as the link, so the columns line up row to row.
                       <span className="w-6 shrink-0" aria-hidden />
