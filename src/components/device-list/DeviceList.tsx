@@ -289,7 +289,8 @@ export default function DeviceList({
         )}
       </div>
 
-      <div className="rounded-md border border-border bg-panel">
+      {/* Scrolls sideways inside the card on narrow screens instead of widening the page. */}
+      <div className="overflow-x-auto rounded-md border border-border bg-panel">
         <table className="w-full text-left text-[13px]">
           <thead className="whitespace-nowrap border-b border-border text-[12px] text-muted">
             <tr>

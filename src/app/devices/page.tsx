@@ -10,7 +10,7 @@ import type { DeviceListRow } from "@/lib/device-list/types";
 export default function DevicesPage() {
   return (
     <AppShell crumbs={[{ label: "Devices" }]}>
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
         <h1 className="mb-6 text-xl font-medium">Devices</h1>
         <Suspense fallback={<DevicesSkeleton />}>
           <DevicesContent />
@@ -23,7 +23,7 @@ export default function DevicesPage() {
 function DevicesSkeleton() {
   return (
     <>
-      <div className="mb-6 grid grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
         <Stat label="Total" />
         <Stat label="Online" dot="bg-accent" />
         <Stat label="Offline" dot="bg-muted/50" />
@@ -60,7 +60,7 @@ async function DevicesContent() {
 
         {!error && (
           <>
-            <div className="mb-6 grid grid-cols-3 gap-4">
+            <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
               <Stat label="Total" value={devices.length} />
               <Stat label="Online" value={online} dot="bg-accent" />
               <Stat label="Offline" value={devices.length - online} dot="bg-muted/50" />
@@ -74,7 +74,7 @@ async function DevicesContent() {
 
 function Stat({ label, value, dot }: { label: string; value?: number; dot?: string }) {
   return (
-    <div className="rounded-md border border-border bg-panel px-4 py-3">
+    <div className="min-w-0 rounded-md border border-border bg-panel px-3 py-3 sm:px-4">
       <div className="mb-1 flex items-center gap-1.5 text-[12px] text-muted">
         {dot && <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
         {label}
