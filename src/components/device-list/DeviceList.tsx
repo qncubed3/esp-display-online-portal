@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Cpu, ExternalLink, FileCode2, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Cpu, ExternalLink, FileCode2, Info, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import LivePreviewButton from "@/components/devices/LivePreviewButton";
 import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
 import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/components/ui/cn";
 import { addDevice, deleteDevice, regenerateDeviceKey, type SubscribableService } from "@/lib/devices/actions";
@@ -41,6 +42,76 @@ function SignalBars({ rssi }: { rssi: number }) {
       </span>
       <span className="tabular-nums">{rssi} dBm</span>
     </span>
+  );
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <dt className="text-muted">{label}</dt>
+      <dd className="min-w-0 truncate text-right">{children}</dd>
+    </div>
+  );
+}
+
+// The rest of a device's details, behind the row's Info button.
+function DeviceInfoButton({ d, now }: { d: DeviceListRow; now: number }) {
+  const [open, setOpen] = useState(false);
+  const when = (iso: string | null) =>
+    iso ? <span title={new Date(iso).toLocaleString()}>{timeAgo(iso, now)}</span> : "Never";
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Device details"
+        aria-label={`Details for ${d.name}`}
+        className={iconButton}
+      >
+        <Info size={13} />
+      </button>
+      <Dialog open={open} onClose={() => setOpen(false)} title={d.name}>
+        <dl className="divide-y divide-border text-[13px]">
+          <InfoRow label="Status">
+            <span className="inline-flex items-center gap-1.5">
+              <span className={cn("h-2 w-2 rounded-full", d.online ? "bg-accent" : "bg-muted/40")} />
+              {d.online ? "Online" : "Offline"}
+            </span>
+          </InfoRow>
+          <InfoRow label="Service">
+            {d.serviceName ? `${d.serviceName}${d.shared ? " (shared with you)" : ""}` : "No service"}
+          </InfoRow>
+          <InfoRow label="Update frequency">{d.pollSeconds < 60 ? `${d.pollSeconds} s` : `${d.pollSeconds / 60} min`}</InfoRow>
+          <InfoRow label="Last seen">{when(d.lastSeenAt)}</InfoRow>
+          <InfoRow label="Last logged poll">{when(d.lastPollAt)}</InfoRow>
+          <InfoRow label="Last result">
+            {d.lastStatus != null ? <StatusBadge status={d.lastStatus} error={d.lastError} /> : dash}
+          </InfoRow>
+          {d.lastError && (
+            <div className="py-2">
+              <dt className="mb-1 text-muted">Last error</dt>
+              <dd className="break-words font-mono text-[12px] text-[#ff8a8e]">{d.lastError}</dd>
+            </div>
+          )}
+          <InfoRow label="Polls in the last 24 h">{d.polls24h.toLocaleString("en")}</InfoRow>
+          <InfoRow label="Firmware">{d.fw ? <span className="font-mono text-[12px]">{d.fw}</span> : dash}</InfoRow>
+          <InfoRow label="WiFi signal">
+            {d.rssi != null ? (
+              <span className="inline-flex items-center gap-2">
+                <SignalBars rssi={d.rssi} />
+              </span>
+            ) : (
+              dash
+            )}
+          </InfoRow>
+          <InfoRow label="Free memory">{d.heap != null ? formatBytes(d.heap) : dash}</InfoRow>
+          <InfoRow label="Uptime">{d.uptimeS != null ? formatUptime(d.uptimeS) : dash}</InfoRow>
+          <InfoRow label="Device ID">
+            <span className="font-mono text-[12px] text-muted">{d.id}</span>
+          </InfoRow>
+        </dl>
+      </Dialog>
+    </>
   );
 }
 
@@ -218,7 +289,7 @@ export default function DeviceList({
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-border bg-panel">
+      <div className="rounded-md border border-border bg-panel">
         <table className="w-full text-left text-[13px]">
           <thead className="whitespace-nowrap border-b border-border text-[12px] text-muted">
             <tr>
@@ -226,12 +297,7 @@ export default function DeviceList({
               <th className="px-4 py-2 font-normal">Service</th>
               <th className="px-4 py-2 font-normal">Update frequency</th>
               <th className="px-4 py-2 font-normal">Last seen</th>
-              <th className="px-4 py-2 font-normal">Firmware</th>
-              <th className="px-4 py-2 font-normal">WiFi</th>
-              <th className="px-4 py-2 text-right font-normal">Free heap</th>
-              <th className="px-4 py-2 text-right font-normal">Uptime</th>
-              <th className="px-4 py-2 font-normal">Last status</th>
-              <th className="px-4 py-2 text-right font-normal">Polls 24h</th>
+              <th className="px-4 py-2 font-normal">Status</th>
               <th className="w-px px-4 py-2">
                 <span className="sr-only">Actions</span>
               </th>
@@ -246,7 +312,9 @@ export default function DeviceList({
                       className={cn("h-2 w-2 shrink-0 rounded-full", d.online ? "bg-accent" : "bg-muted/40")}
                       title={d.online ? "Online" : "Offline"}
                     />
-                    <span className="truncate font-medium">{d.name}</span>
+                    <span className="max-w-[14rem] truncate font-medium" title={d.name}>
+                      {d.name}
+                    </span>
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-1.5">
@@ -283,21 +351,13 @@ export default function DeviceList({
                     "Never"
                   )}
                 </td>
-                <td className="px-4 py-2.5 font-mono text-[12px]">{d.fw ?? dash}</td>
-                <td className="whitespace-nowrap px-4 py-2.5">{d.rssi != null ? <SignalBars rssi={d.rssi} /> : dash}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
-                  {d.heap != null ? formatBytes(d.heap) : dash}
-                </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
-                  {d.uptimeS != null ? formatUptime(d.uptimeS) : dash}
-                </td>
                 <td className="px-4 py-2.5">
                   {d.lastStatus != null ? <StatusBadge status={d.lastStatus} error={d.lastError} /> : dash}
                 </td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{d.polls24h.toLocaleString("en")}</td>
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                     {busy === d.id && <Loader2 size={13} className="animate-spin text-muted" />}
+                    <DeviceInfoButton d={d} now={now} />
                     <LivePreviewButton deviceId={d.id} deviceName={d.name} />
                     <button
                       type="button"
@@ -334,7 +394,7 @@ export default function DeviceList({
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-10 text-center text-[13px] text-muted">
+                <td colSpan={6} className="px-4 py-10 text-center text-[13px] text-muted">
                   No devices match.
                 </td>
               </tr>
