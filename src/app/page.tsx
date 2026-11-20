@@ -29,11 +29,11 @@ export default async function DashboardPage() {
   const shared = sharedCount ?? 0;
 
   return (
-    <AppShell email={user.email ?? ""} crumbs={[{ label: "Services" }]}>
+    <AppShell email={user.email ?? ""} crumbs={[{ label: "My Services" }]}>
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-3">
-            <h1 className="text-xl font-medium">Your services</h1>
+            <h1 className="text-xl font-medium">My Services</h1>
             {shared > 0 && (
               <Link href="/shared" className="text-[13px] text-muted transition-colors hover:text-fg">
                 {shared} shared with you →

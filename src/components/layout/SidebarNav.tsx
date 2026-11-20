@@ -6,7 +6,7 @@ import { Activity, BookOpen, Cpu, KeyRound, LayoutGrid, LayoutTemplate, Settings
 
 const SECTIONS = [
   [
-    { href: "/", label: "Services", icon: LayoutGrid },
+    { href: "/", label: "My Services", icon: LayoutGrid },
     { href: "/shared", label: "Shared with me", icon: Users },
     { href: "/templates", label: "Templates", icon: LayoutTemplate },
   ],

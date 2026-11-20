@@ -28,7 +28,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   const isOwner = service.owner_id === user.id;
 
   return (
-    <AppShell email={user.email ?? ""} crumbs={[{ label: "Services", href: "/" }, { label: service.name }]}>
+    <AppShell email={user.email ?? ""} crumbs={[isOwner ? { label: "My Services", href: "/" } : { label: "Shared with me", href: "/shared" }, { label: service.name }]}>
       <div className="mx-auto max-w-6xl px-6 pt-6">
         <ServiceHeader serviceId={service.id} name={service.name} enabled={service.enabled} isOwner={isOwner} />
         <ServiceEditor
