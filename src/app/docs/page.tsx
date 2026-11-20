@@ -366,7 +366,8 @@ export default function DocsPage() {
               <B>Move here</B> on a Service&apos;s Devices tab). The key and firmware stay the same; the device gets the new
               screen on its next poll. A device with no Service shows <B>No service assigned</B>, and deleting a Service
               leaves its devices unassigned. A device shows as online if it polled in the last 2 minutes. Deleting a device
-              revokes its key.
+              revokes its key. <B>Live</B> on a device row opens a preview of its screen, rebuilt from the saved Service
+              with current data, with when it last polled and a countdown to its next update.
             </P>
 
             <H3>Flash it with the Arduino IDE</H3>
