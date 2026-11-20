@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Design screens for ESP32 displays.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="h-full bg-bg text-fg">{children}</body>

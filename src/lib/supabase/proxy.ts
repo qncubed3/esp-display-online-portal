@@ -33,9 +33,10 @@ export async function updateSession(request: NextRequest) {
   // API routes answer for themselves (401 JSON), so never redirect them.
   const isPublic = path.startsWith("/api/") || PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
-  if (!signedIn && !isPublic) {
+  const target = !signedIn && !isPublic ? "/login" : signedIn && path === "/login" ? "/" : null;
+  if (target) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = target;
     url.search = "";
     const redirect = NextResponse.redirect(url);
     response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
