@@ -251,8 +251,12 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                       />
                       {d.name}
                       {!d.mine && (
-                        <span className="inline-flex items-center gap-1 text-[12px] text-[#6b6b6b]" title="Only its owner can change this device">
-                          <Users size={12} /> owned by someone else
+                        <span
+                          className="inline-flex min-w-0 items-center gap-1 text-[12px] text-[#6b6b6b]"
+                          title={`Owned by ${d.owner_email ?? "another user"}; only its owner can change it`}
+                        >
+                          <Users size={12} className="shrink-0" />
+                          <span className="truncate">{d.owner_email ?? "owned by someone else"}</span>
                         </span>
                       )}
                     </span>

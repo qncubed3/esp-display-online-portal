@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Cpu, ExternalLink, FileCode2, Info, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import LivePreviewButton from "@/components/devices/LivePreviewButton";
 import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
+import TransferDeviceButton from "@/components/devices/TransferDeviceButton";
 import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -142,6 +143,7 @@ export default function DeviceList({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // device id or "add"
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [shownKey, setShownKey] = useState<{ name: string; key: string } | null>(null);
   // Setup files dialog: key is set when opened from the one-time key callout.
   const [filesFor, setFilesFor] = useState<{ name: string; key?: string } | null>(null);
@@ -195,7 +197,7 @@ export default function DeviceList({
 
   // Add form, one-time key and errors, above the table (or the empty state).
   const panels =
-    adding || shownKey || error ? (
+    adding || shownKey || error || notice ? (
       <div className="mb-3 space-y-3">
         {adding && (
           <AddDeviceForm
@@ -212,6 +214,14 @@ export default function DeviceList({
             onClose={() => setShownKey(null)}
             onSetupFiles={() => setFilesFor({ name: shownKey.name, key: shownKey.key })}
           />
+        )}
+        {notice && (
+          <p className="flex items-start justify-between gap-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-[13px] text-fg">
+            {notice}
+            <button type="button" onClick={() => setNotice(null)} className="shrink-0 text-muted hover:text-fg">
+              Dismiss
+            </button>
+          </p>
         )}
         {error && (
           <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-[#ff8a8e]">{error}</p>
@@ -383,6 +393,16 @@ export default function DeviceList({
                     >
                       <KeyRound size={13} />
                     </button>
+                    <TransferDeviceButton
+                      deviceId={d.id}
+                      deviceName={d.name}
+                      disabled={busy !== null}
+                      className={iconButton}
+                      onDone={(message) => {
+                        setNotice(message);
+                        router.refresh();
+                      }}
+                    />
                     <button
                       type="button"
                       onClick={() => void onDelete(d)}

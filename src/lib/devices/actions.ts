@@ -5,6 +5,8 @@
 // owners manage their own devices; anyone with access to a Service can read the devices on it.
 
 import { revalidatePath } from "next/cache";
+import { notify } from "@/lib/notifications/notify";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { generateDeviceKey, hashKey } from "./keys";
 
@@ -22,6 +24,8 @@ export interface DeviceRow {
 /** A device on a Service's Devices tab; `mine` is true when the signed-in user owns it. */
 export interface ServiceDeviceRow extends DeviceRow {
   mine: boolean;
+  /** The owner's email; null if it couldn't be looked up. */
+  owner_email: string | null;
 }
 
 /** One of the signed-in user's devices, with the name of the Service it's subscribed to. */
@@ -99,7 +103,22 @@ export async function listServiceDevices(serviceId: string): Promise<ServiceDevi
     .eq("service_id", serviceId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as DeviceRow[]).map((d) => ({ ...d, mine: d.owner_id === user.id }));
+  const devices = (data ?? []) as DeviceRow[];
+  const emails = await emailsFor(devices.map((d) => d.owner_id));
+  return devices.map((d) => ({ ...d, mine: d.owner_id === user.id, owner_email: emails.get(d.owner_id) ?? null }));
+}
+
+// Emails for user ids, via the admin API (users can't read auth.users). Only called with the
+// owners of devices the caller can already see.
+async function emailsFor(userIds: string[]): Promise<Map<string, string>> {
+  const admin = createAdminClient();
+  const entries = await Promise.all(
+    [...new Set(userIds)].map(async (id) => {
+      const { data } = await admin.auth.admin.getUserById(id);
+      return [id, data.user?.email ?? ""] as const;
+    }),
+  );
+  return new Map(entries.filter(([, email]) => email));
 }
 
 // Creates a device owned by the signed-in user (owner_id defaults to auth.uid()) and returns its key.
@@ -171,4 +190,64 @@ export async function deleteDevice(deviceId: string): Promise<void> {
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error("Device not found");
   revalidateDevicePages((data[0] as { service_id: string | null }).service_id);
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Hands a device to another user, by email. Same key, so the device keeps working without a
+// reflash. If the new owner can't access the device's Service, it's unsubscribed (shows the
+// "no service" screen) until they pick one. The new owner gets a notification.
+// Returns errors instead of throwing so the message survives production builds.
+export async function transferDevice(
+  deviceId: string,
+  email: string,
+): Promise<{ error?: string; unsubscribed?: boolean; ownerEmail?: string }> {
+  const normalized = (email ?? "").trim().toLowerCase();
+  if (!EMAIL_RE.test(normalized)) return { error: "Enter a valid email address." };
+
+  const { supabase, user } = await signedIn();
+  if (normalized === (user.email ?? "").toLowerCase()) return { error: "You already own this device." };
+
+  const { data: device, error: readError } = await supabase
+    .from("devices")
+    .select("id, name, service_id")
+    .eq("id", deviceId)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!device) return { error: "Only the device's owner can transfer it." };
+  const d = device as { id: string; name: string; service_id: string | null };
+
+  // Ownership changes bypass RLS (users can't write owner_id), so every check is done above and here.
+  const admin = createAdminClient();
+  const { data: targetId, error: lookupError } = await admin.rpc("user_id_by_email", { p_email: normalized });
+  if (lookupError) return { error: "Could not look up that email." };
+  if (!targetId) return { error: "No user with that email." };
+  if (targetId === user.id) return { error: "You already own this device." };
+
+  let keepService = false;
+  if (d.service_id) {
+    const [{ data: svc }, { data: member }] = await Promise.all([
+      admin.from("services").select("owner_id").eq("id", d.service_id).maybeSingle(),
+      admin.from("service_members").select("user_id").eq("service_id", d.service_id).eq("user_id", targetId).maybeSingle(),
+    ]);
+    keepService = (svc as { owner_id: string } | null)?.owner_id === targetId || !!member;
+  }
+
+  const { data: updated, error } = await admin
+    .from("devices")
+    .update({ owner_id: targetId as string, service_id: keepService ? d.service_id : null })
+    .eq("id", d.id)
+    .eq("owner_id", user.id)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!updated?.length) return { error: "Only the device's owner can transfer it." };
+
+  await notify(targetId as string, "device_transferred", {
+    device_id: d.id,
+    device_name: d.name,
+    from_email: user.email ?? "Someone",
+  });
+  revalidateDevicePages(d.service_id);
+  return { unsubscribed: !!d.service_id && !keepService, ownerEmail: normalized };
 }

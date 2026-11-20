@@ -14,12 +14,11 @@ export interface MemberRow {
   created_at: string;
 }
 
-export interface NotificationRow {
-  service_id: string;
-  service_name: string;
-  created_at: string;
-  seen_at: string | null;
-}
+// The bell's items: Services the user was added to (from service_members) and everything in the
+// notifications table (migration 009), e.g. devices transferred to them.
+export type NotificationRow =
+  | { kind: "shared"; id: string; service_id: string; service_name: string; created_at: string; seen_at: string | null }
+  | { kind: "device_transferred"; id: string; device_name: string; from_email: string; created_at: string; seen_at: string | null };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -110,39 +109,63 @@ export async function leaveService(serviceId: string): Promise<void> {
   redirect("/shared");
 }
 
-// Services the caller has been added to, newest first.
+// The caller's notifications, newest first. The notifications table is optional (migration 009):
+// if it's missing, only the "added to a Service" items show.
 export async function listNotifications(): Promise<NotificationRow[]> {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase
-    .from("service_members")
-    .select("service_id, created_at, seen_at, services(name)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
-  if (error) throw new Error(error.message);
-  type Row = {
+  const [members, other] = await Promise.all([
+    supabase
+      .from("service_members")
+      .select("service_id, created_at, seen_at, services(name)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase.from("notifications").select("id, kind, data, created_at, seen_at").order("created_at", { ascending: false }).limit(50),
+  ]);
+  if (members.error) throw new Error(members.error.message);
+  type MemberNotice = {
     service_id: string;
     created_at: string;
     seen_at: string | null;
     services: { name: string } | { name: string }[] | null;
   };
-  return ((data ?? []) as unknown as Row[]).map((r) => {
+  const shared: NotificationRow[] = ((members.data ?? []) as unknown as MemberNotice[]).map((r) => {
     const svc = Array.isArray(r.services) ? r.services[0] : r.services;
     return {
+      kind: "shared",
+      id: `shared:${r.service_id}`,
       service_id: r.service_id,
       service_name: svc?.name ?? "a service",
       created_at: r.created_at,
       seen_at: r.seen_at,
     };
   });
+
+  type Notice = { id: number; kind: string; data: Record<string, unknown> | null; created_at: string; seen_at: string | null };
+  const rest: NotificationRow[] = [];
+  for (const n of (other.error ? [] : (other.data ?? [])) as Notice[]) {
+    if (n.kind === "device_transferred") {
+      rest.push({
+        kind: "device_transferred",
+        id: `n:${n.id}`,
+        device_name: String(n.data?.device_name ?? "a device"),
+        from_email: String(n.data?.from_email ?? "Someone"),
+        created_at: n.created_at,
+        seen_at: n.seen_at,
+      });
+    }
+  }
+
+  return [...shared, ...rest].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 50);
 }
 
 export async function markNotificationsSeen(): Promise<void> {
   const { supabase, user } = await requireUser();
-  const { error } = await supabase
-    .from("service_members")
-    .update({ seen_at: new Date().toISOString() })
-    .eq("user_id", user.id)
-    .is("seen_at", null);
-  if (error) throw new Error(error.message);
+  const seenAt = new Date().toISOString();
+  const [members] = await Promise.all([
+    supabase.from("service_members").update({ seen_at: seenAt }).eq("user_id", user.id).is("seen_at", null),
+    // Ignored if migration 009 hasn't run.
+    supabase.from("notifications").update({ seen_at: seenAt }).eq("user_id", user.id).is("seen_at", null),
+  ]);
+  if (members.error) throw new Error(members.error.message);
 }

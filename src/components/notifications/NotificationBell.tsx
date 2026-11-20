@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import ServiceLink from "@/components/services/ServiceLink";
 import { Bell, Loader2 } from "lucide-react";
 import { listNotifications, markNotificationsSeen, type NotificationRow } from "@/lib/sharing/actions";
 import { cn } from "@/components/ui/cn";
 import { timeAgo } from "@/lib/time";
 
-// Top-bar bell: Services the user was added to. Opening the dropdown marks them all seen.
+// Top-bar bell: Services the user was added to, devices transferred to them. Opening the dropdown marks them all seen.
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationRow[] | null>(null);
@@ -98,28 +99,46 @@ export default function NotificationBell() {
             <p className="px-3 py-6 text-center text-[13px] text-muted">No notifications</p>
           ) : (
             <ul className="max-h-96 divide-y divide-border overflow-auto">
-              {items.map((n) => (
-                <li key={n.service_id}>
-                  <ServiceLink
-                    service={{ id: n.service_id, name: n.service_name, shared: true }}
-                    onClick={close}
-                    className="flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-panel-hover"
-                  >
+              {items.map((n) => {
+                const body = (
+                  <>
                     <span
                       className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", n.seen_at ? "bg-transparent" : "bg-accent")}
                       aria-hidden
                     />
                     <span className="min-w-0">
                       <span className="block text-[13px] text-fg">
-                        You were added to <span className="font-medium">{n.service_name}</span>
+                        {n.kind === "shared" ? (
+                          <>
+                            You were added to <span className="font-medium">{n.service_name}</span>
+                          </>
+                        ) : (
+                          <>
+                            {n.from_email} transferred <span className="font-medium">{n.device_name}</span> to you
+                          </>
+                        )}
                       </span>
                       <span className="block text-[12px] text-muted" title={new Date(n.created_at).toLocaleString()}>
                         {timeAgo(n.created_at)}
                       </span>
                     </span>
-                  </ServiceLink>
-                </li>
-              ))}
+                  </>
+                );
+                const cls = "flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-panel-hover";
+                return (
+                  <li key={n.id}>
+                    {n.kind === "shared" ? (
+                      <ServiceLink service={{ id: n.service_id, name: n.service_name, shared: true }} onClick={close} className={cls}>
+                        {body}
+                      </ServiceLink>
+                    ) : (
+                      <Link href="/devices" onClick={close} className={cls}>
+                        {body}
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
