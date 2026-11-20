@@ -1,13 +1,16 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Braces, List, LoaderCircle, Plus, RefreshCw } from "lucide-react";
+import { Braces, ChevronDown, List, LoaderCircle, Plus, Redo2, RefreshCw, Undo2 } from "lucide-react";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
 import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
 import EditablePreview from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
+
+const iconBtnCls =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-hover text-fg outline-none transition-colors hover:border-border-strong hover:bg-[#2a2a2a] focus-visible:ring-1 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-panel-hover";
 
 const btnCls =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-panel-hover px-3 text-[13px] text-fg outline-none transition-colors hover:border-border-strong hover:bg-[#2a2a2a] focus-visible:ring-1 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50";
@@ -23,8 +26,11 @@ export default function DrawSection(props: {
   onRefreshData(): void;
   /** Rendered under the preview (the AI assistant). */
   belowPreview?: ReactNode;
+  history: { undo(): void; redo(): void; canUndo: boolean; canRedo: boolean };
 }) {
-  const { rows, onChange, vars, varsError, refreshing, onRefreshData, belowPreview } = props;
+  const { rows, onChange, vars, varsError, refreshing, onRefreshData, belowPreview, history } = props;
+  // Below xl (stacked layout) the commands start collapsed so the preview is visible right away.
+  const [collapsed, setCollapsed] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOp, setAddOp] = useState("text");
   const [mode, setMode] = useState<"rows" | "json">("rows");
@@ -44,12 +50,36 @@ export default function DrawSection(props: {
   return (
     <div className="flex flex-col gap-6 min-w-0 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5 xl:flex-row xl:items-start">
       <section className="min-w-0 flex-1" aria-label="Draw commands">
-        <div className="mb-3 flex items-baseline gap-3">
-          <h2 className="text-[14px] font-medium">Draw</h2>
-          <span className="text-muted">
-            {rows.length} {rows.length === 1 ? "command" : "commands"}
-          </span>
+        <div className={`flex items-center justify-between gap-3 xl:mb-3 ${collapsed ? "" : "mb-3"}`}>
+          <h2 className="min-w-0 text-[14px] font-medium">
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              aria-expanded={!collapsed}
+              aria-controls="draw-commands-body"
+              className="-mx-1 inline-flex min-w-0 items-baseline gap-3 rounded px-1 outline-none focus-visible:ring-1 focus-visible:ring-accent xl:pointer-events-none"
+            >
+              <ChevronDown
+                size={14}
+                aria-hidden
+                className={`shrink-0 self-center text-muted transition-transform xl:hidden ${collapsed ? "-rotate-90" : ""}`}
+              />
+              Draw
+              <span className="truncate font-normal text-muted">
+                {rows.length} {rows.length === 1 ? "command" : "commands"}
+              </span>
+            </button>
+          </h2>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" className={iconBtnCls}>
+              <Undo2 size={14} aria-hidden />
+            </button>
+            <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className={iconBtnCls}>
+              <Redo2 size={14} aria-hidden />
+            </button>
+          </div>
         </div>
+        <div id="draw-commands-body" className={collapsed ? "hidden xl:block" : ""}>
         <div className="mb-3 flex items-center justify-between gap-2">
           <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
             {(
@@ -95,6 +125,7 @@ export default function DrawSection(props: {
         ) : (
           <DrawJsonEditor rows={rows} onChange={onChange} />
         )}
+        </div>
       </section>
 
       <aside className="flex w-full min-w-0 shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">

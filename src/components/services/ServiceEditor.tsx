@@ -10,6 +10,7 @@ import DataEditor from "@/components/data/DataEditor";
 import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
 import DrawSection from "@/components/draw/DrawSection";
+import { useHistory } from "@/components/draw/useHistory";
 import NextUpdateCountdown from "@/components/services/NextUpdateCountdown";
 import ActivitySection from "@/components/stats/ActivitySection";
 import LoadTemplateDialog, { type LoadMode } from "@/components/templates/LoadTemplateDialog";
@@ -54,7 +55,9 @@ export default function ServiceEditor({
   initialRows: DrawRow[];
 }) {
   const [code, setCode] = useState(initialCode);
-  const [rows, setRows] = useState<DrawRow[]>(initialRows);
+  // Draw rows with undo/redo; template loads and AI changes are their own undo steps.
+  const rowsHistory = useHistory<DrawRow[]>(initialRows);
+  const { value: rows, set: setRows, undo: undoRows, redo: redoRows } = rowsHistory;
   const [saved, setSaved] = useState({ code: initialCode, rows: JSON.stringify(initialRows) });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
@@ -120,7 +123,7 @@ export default function ServiceEditor({
     apply: useCallback(
       (change: { code?: string; rows?: DrawRow[] }) => {
         if (change.rows) {
-          setRows(change.rows);
+          setRows(change.rows, { group: false });
           rowsRef.current = change.rows;
         }
         if (change.code !== undefined) {
@@ -129,7 +132,7 @@ export default function ServiceEditor({
           void refreshData();
         }
       },
-      [refreshData],
+      [refreshData, setRows],
     ),
   });
 
@@ -154,7 +157,7 @@ export default function ServiceEditor({
       setCode(t.dataCode);
       codeRef.current = t.dataCode; // so refreshData below runs the new code before the re-render
     }
-    if (loadDraw) setRows(t.rows.map((r) => ({ ...r, id: crypto.randomUUID(), args: { ...r.args } })));
+    if (loadDraw) setRows(t.rows.map((r) => ({ ...r, id: crypto.randomUUID(), args: { ...r.args } })), { group: false });
     openTab(loadDraw ? "draw" : "data");
     void refreshData();
   };
@@ -185,6 +188,25 @@ export default function ServiceEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [save]);
+
+  // Undo / redo in the Draw tab. Inputs and the code editors keep their own native undo.
+  useEffect(() => {
+    if (tab !== "draw") return;
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      const isUndo = key === "z" && !e.shiftKey;
+      const isRedo = (key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey);
+      if (!isUndo && !isRedo) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable], .cm-editor")) return;
+      e.preventDefault();
+      if (isUndo) undoRows();
+      else redoRows();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, undoRows, redoRows]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -291,7 +313,8 @@ export default function ServiceEditor({
       {tab === "draw" && (
         <DrawSection
           rows={rows}
-          onChange={setRows}
+          onChange={(next) => setRows(next)}
+          history={{ undo: undoRows, redo: redoRows, canUndo: rowsHistory.canUndo, canRedo: rowsHistory.canRedo }}
           vars={vars}
           varsError={varsError}
           refreshing={refreshing}
