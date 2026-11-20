@@ -1,6 +1,6 @@
 import type { RawWireOp } from "@/lib/draw/wire";
-import { rows } from "./rows";
-import type { Template } from "./types";
+import { rows } from "../rows";
+import type { Template } from "../types";
 
 // Clock (vk3ptn): port of https://github.com/vk3ptn/Clock (Clock.ino v1.0.4)
 //
@@ -172,7 +172,7 @@ const vk3Wire: RawWireOp[] = [
   ["drawString", "{wind}", 162, 205, 4],
 ];
 
-export const clockVk3ptn: Template = {
+const template: Template = {
   id: "clock-vk3ptn",
   name: "Clock (vk3ptn)",
   description:
@@ -183,3 +183,5 @@ export const clockVk3ptn: Template = {
   rows: rows("clock-vk3ptn", vk3Wire),
   sampleVars: {"ampm": "PM", "cloud_y195": 195, "cloud_y199": 199, "cloud_y200": 200, "cloud_y203": 203, "cond": "Cloudy", "date": "Fri 20/11/2026", "deg_c": "c", "deg_c_x": 124, "deg_col": "#FFFF00", "deg_x": 119, "fog_y193": -207, "fog_y198": -202, "fog_y203": -197, "h1_a": "#000000", "h1_b": "#00FFFF", "h1_c": "#00FFFF", "h1_d": "#000000", "h1_e": "#000000", "h1_f": "#000000", "h1_g": "#000000", "h2_a": "#000000", "h2_b": "#00FFFF", "h2_c": "#00FFFF", "h2_d": "#000000", "h2_e": "#000000", "h2_f": "#000000", "h2_g": "#000000", "humidity": "92% RH", "m1_a": "#00FFFF", "m1_b": "#00FFFF", "m1_c": "#00FFFF", "m1_d": "#00FFFF", "m1_e": "#00FFFF", "m1_f": "#00FFFF", "m1_g": "#000000", "m2_a": "#00FFFF", "m2_b": "#00FFFF", "m2_c": "#00FFFF", "m2_d": "#00FFFF", "m2_e": "#000000", "m2_f": "#000000", "m2_g": "#00FFFF", "rain_y191": -209, "rain_y195": -205, "rain_y197": -203, "rain_y204": -196, "rain_y210": -190, "storm_y190": -210, "storm_y197": -203, "storm_y205": -195, "storm_y213": -187, "sun_y177": -223, "sun_y182": -218, "sun_y185": -215, "sun_y195": -205, "sun_y204": -196, "sun_y207": -193, "sun_y212": -188, "temp": "19.5", "wind": "15 Km/h N"},
 };
+
+export default template;

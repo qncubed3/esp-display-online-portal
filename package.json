@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/gen-templates.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/gen-templates.mjs",
     "build": "next build",
+    "gen:templates": "node scripts/gen-templates.mjs",
     "start": "next start",
     "lint": "eslint"
   },

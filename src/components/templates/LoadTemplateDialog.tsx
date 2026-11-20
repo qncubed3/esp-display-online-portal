@@ -8,6 +8,8 @@ import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/components/ui/cn";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, toWireOps } from "@/lib/draw/ops";
 import { renderPreview } from "@/lib/draw/preview";
+import LazyMount from "@/components/templates/LazyMount";
+import { TemplateFilterBar, useTemplateFilter } from "@/components/templates/TemplateFilters";
 import { TEMPLATES, type Template } from "@/lib/templates/catalog";
 
 export type LoadMode = "both" | "draw" | "data";
@@ -37,6 +39,15 @@ function ScreenThumb({ t }: { t: Template }) {
   );
 }
 
+// Same size as ScreenThumb, shown until the card nears the visible part of the grid.
+const THUMB_PLACEHOLDER = (
+  <div
+    aria-hidden
+    className="block w-full rounded-[3px] bg-black"
+    style={{ aspectRatio: `${SCREEN_WIDTH} / ${SCREEN_HEIGHT}` }}
+  />
+);
+
 function TemplateCard({ t, selected, onSelect }: { t: Template; selected: boolean; onSelect(): void }) {
   return (
     <button
@@ -56,7 +67,9 @@ function TemplateCard({ t, selected, onSelect }: { t: Template; selected: boolea
         </span>
       )}
       <div className="border-b border-border bg-[#111] p-2.5">
-        <ScreenThumb t={t} />
+        <LazyMount placeholder={THUMB_PLACEHOLDER}>
+          <ScreenThumb t={t} />
+        </LazyMount>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         <span className="text-[13px] font-medium leading-snug text-fg">{t.name}</span>
@@ -95,10 +108,13 @@ export default function LoadTemplateDialog({
   }, [open, initialTemplateId]);
   const [mode, setMode] = useState<LoadMode>("both");
   const selected = TEMPLATES.find((t) => t.id === selectedId) ?? null;
+  const filter = useTemplateFilter(TEMPLATES);
 
   function close() {
     setSelectedId(null);
     setMode("both");
+    filter.setQuery("");
+    filter.setCategory("all");
     onClose();
   }
 
@@ -138,16 +154,22 @@ export default function LoadTemplateDialog({
             Pick a template to load into this Service. Previews show sample data.
           </p>
 
+          <TemplateFilterBar {...filter} className="shrink-0" />
+
           <div
             role="radiogroup"
             aria-label="Templates"
             className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-1"
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {TEMPLATES.map((t) => (
-                <TemplateCard key={t.id} t={t} selected={t.id === selectedId} onSelect={() => setSelectedId(t.id)} />
-              ))}
-            </div>
+            {filter.results.length === 0 ? (
+              <p className="py-10 text-center text-[13px] text-muted">No templates match your search.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filter.results.map((t) => (
+                  <TemplateCard key={t.id} t={t} selected={t.id === selectedId} onSelect={() => setSelectedId(t.id)} />
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="shrink-0 space-y-3 border-t border-border pt-4">

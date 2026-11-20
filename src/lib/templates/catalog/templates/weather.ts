@@ -1,6 +1,6 @@
 import type { RawWireOp } from "@/lib/draw/wire";
-import { rows } from "./rows";
-import type { Template } from "./types";
+import { rows } from "../rows";
+import type { Template } from "../types";
 
 // Weather
 
@@ -126,7 +126,7 @@ const weatherWire: RawWireOp[] = [
   ["drawString", "{wind_unit}", 277, 216, 1],
 ];
 
-export const weather: Template = {
+const template: Template = {
   id: "weather",
   name: "Weather",
   description: "Big current temperature with an icon, today's low and high, rain chance and wind.",
@@ -136,3 +136,5 @@ export const weather: Template = {
   rows: rows("weather", weatherWire),
   sampleVars: {"clock": "Fri 22:50", "cond": "Partly cloudy", "feels": "Feels like 21", "high": "27", "ic_cloud": "#FFFFFF", "ic_cloud_y": 100, "ic_drop": "#00C8FF", "ic_drop_y": -200, "ic_psun_y": 78, "ic_sun_y": -200, "low": "20", "place": "MELBOURNE", "rain": "20%", "temp": "20", "temp_col": "#FFC040", "wind": "14", "wind_unit": "km/h N"},
 };
+
+export default template;

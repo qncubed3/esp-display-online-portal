@@ -1,6 +1,6 @@
 import type { RawWireOp } from "@/lib/draw/wire";
-import { rows } from "./rows";
-import type { Template } from "./types";
+import { rows } from "../rows";
+import type { Template } from "../types";
 
 // Crypto prices
 
@@ -82,7 +82,7 @@ const cryptoWire: RawWireOp[] = [
   }),
 ];
 
-export const crypto: Template = {
+const template: Template = {
   id: "crypto",
   name: "Crypto prices",
   description: "Bitcoin, Ethereum and Solana in AUD with 24-hour change, green up and red down.",
@@ -92,3 +92,5 @@ export const crypto: Template = {
   rows: rows("crypto", cryptoWire),
   sampleVars: {"c1_base": 78, "c1_chg": "-2.80%", "c1_chg_col": "#FF5A5F", "c1_col": "#F7931A", "c1_letter": "B", "c1_name": "Bitcoin", "c1_price": "$92,701", "c1_sym": "BTC", "c1_tip": 87, "c2_base": 146, "c2_chg": "-2.77%", "c2_chg_col": "#FF5A5F", "c2_col": "#627EEA", "c2_letter": "E", "c2_name": "Ethereum", "c2_price": "$2,622", "c2_sym": "ETH", "c2_tip": 155, "c3_base": 214, "c3_chg": "-3.46%", "c3_chg_col": "#FF5A5F", "c3_col": "#9945FF", "c3_letter": "S", "c3_name": "Solana", "c3_price": "$107.78", "c3_sym": "SOL", "c3_tip": 223, "clock": "22:50", "currency": "AUD"},
 };
+
+export default template;

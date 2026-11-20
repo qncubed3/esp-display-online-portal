@@ -1,6 +1,6 @@
 import type { RawWireOp } from "@/lib/draw/wire";
-import { rows } from "./rows";
-import type { Template } from "./types";
+import { rows } from "../rows";
+import type { Template } from "../types";
 
 // Big clock + date
 
@@ -50,7 +50,7 @@ const clockWire: RawWireOp[] = [
   ["drawString", "{day_pct}", 160, 224, 1],
 ];
 
-export const clock: Template = {
+const template: Template = {
   id: "clock",
   name: "Clock + date",
   description: "A large clock, the weekday and date, and a bar showing how much of the day has gone.",
@@ -60,3 +60,5 @@ export const clock: Template = {
   rows: rows("clock", clockWire),
   sampleVars: {"accent": "#FFA500", "date": "20 November 2026", "day_pct": "33% OF TODAY DONE", "day_w": 81, "greeting": "Good morning", "time": "08:05", "weekday": "Friday"},
 };
+
+export default template;

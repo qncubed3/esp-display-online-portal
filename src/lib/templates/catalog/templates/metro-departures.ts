@@ -1,6 +1,6 @@
 import type { RawWireOp } from "@/lib/draw/wire";
-import { rows } from "./rows";
-import type { Template } from "./types";
+import { rows } from "../rows";
+import type { Template } from "../types";
 
 // Melbourne Metro departures + weather (port of Metro_Train_Schedule.ino)
 
@@ -162,7 +162,7 @@ const metroWire: RawWireOp[] = [
   ["drawString", "{wind}", 312, 230, 1],
 ];
 
-export const metroDepartures: Template = {
+const template: Template = {
   id: "metro-departures",
   name: "Metro departures + weather",
   description: "Next four trains from a Melbourne Metro platform, with live delays and a weather footer.",
@@ -172,3 +172,5 @@ export const metroDepartures: Template = {
   rows: rows("metro-departures", metroWire),
   sampleVars: {"clock": "22:50", "dest1": "Werribee", "dest2": "Sandringham", "dest3": "Werribee", "dest4": "Sandringham", "ic_cloud": "#FFFFFF", "ic_cloud_y": 230, "ic_drop": "#00FFFF", "ic_drop_y": -200, "ic_psun_y": 226, "ic_sun_y": -200, "late1": "+2m", "late2": "", "late3": "+3m", "late4": "", "min1": "1", "min2": "5", "min3": "22", "min4": "25", "min_col1": "#FFA500", "min_col2": "#00FF00", "min_col3": "#00FF00", "min_col4": "#00FF00", "none": "", "platform": "1", "platform_x": 90, "sep2": "#808080", "sep3": "#808080", "sep4": "#808080", "station": "ALTONA", "time1": "22:52", "time2": "22:56", "time3": "23:13", "time4": "23:16", "weather": "20C  PARTLY CLOUDY  64% RH", "wind": "14 km/h N"},
 };
+
+export default template;

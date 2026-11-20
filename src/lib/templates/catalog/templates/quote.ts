@@ -1,6 +1,6 @@
 import type { RawWireOp } from "@/lib/draw/wire";
-import { rows } from "./rows";
-import type { Template } from "./types";
+import { rows } from "../rows";
+import type { Template } from "../types";
 
 // Quote of the day
 
@@ -84,7 +84,7 @@ const quoteWire: RawWireOp[] = [
   ["drawString", "Quotes by zenquotes.io", 160, 236, 1],
 ];
 
-export const quote: Template = {
+const template: Template = {
   id: "quote",
   name: "Quote of the day",
   description: "A new quote every day, word-wrapped and centred, with its author.",
@@ -94,3 +94,5 @@ export const quote: Template = {
   rows: rows("quote", quoteWire),
   sampleVars: {"author_line": "- Celestine Chua", "author_y": 150, "date": "Fri 20/11", "l1": "Never waste a minute of your", "l2": "precious life thinking about", "l3": "people you don't like.", "l4": "", "l5": "", "l6": "", "y1": 78, "y2": 100, "y3": 122, "y4": 144, "y5": 166, "y6": 188},
 };
+
+export default template;
