@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Supabase-dashboard-style dark palette: bg-bg, bg-panel, border-border, text-fg, text-muted, bg-accent, ... */
+@theme inline {
+  --color-bg: #171717;
+  --color-panel: #1c1c1c;
+  --color-panel-hover: #232323;
+  --color-border: #2e2e2e;
+  --color-border-strong: #3e3e3e;
+  --color-fg: #ededed;
+  --color-muted: #a0a0a0;
+  --color-accent: #3ecf8e;
+  --color-accent-hover: #34b27b;
+  --color-danger: #e5484d;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #171717;
+  color: #ededed;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
