@@ -333,6 +333,7 @@ Open **Tools > Serial Monitor** at 115200 baud to see what the device is doing.
 - Written for the ESP32 Arduino core 3.x (also fine on 2.0.x). If TFT_eSPI fails to
   compile on your core version, install esp32 core 2.0.17 in the Boards Manager.
 - Red and blue swapped? Change \`TFT_RGB_ORDER\` in \`User_Setup.h\` to \`TFT_RGB\`.
+- Colours look like a photo negative? Flip \`tft.invertDisplay(false)\` in \`setup()\` to \`true\`.
 - \`EspDisplay.ino\` and \`User_Setup.h\` are the same for every device; only
   \`config.h\` changes.
 `;
@@ -720,6 +721,9 @@ void setup() {
   digitalWrite(BACKLIGHT_PIN, HIGH);
   tft.init();
   tft.setRotation(1);
+  // The ST7789 init turns colour inversion on; this panel needs it off. If colours look like a
+  // photo negative on your board, change false to true.
+  tft.invertDisplay(false);
   tft.fillScreen(TFT_BLACK);
 
   if (strcmp(WIFI_SSID, "YOUR_WIFI") == 0) {
