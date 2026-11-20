@@ -18,11 +18,11 @@ export interface MemberRow {
 
 // The bell's items: Services the user was added to (from service_members) and everything in the
 // notifications table (migration 009): devices transferred to them, changes to their Services, etc.
-// Table rows carry the same title/body/url as the push notification (lib/notifications/messages.ts).
+// Table rows are turned into title/body/url by lib/notifications/messages.ts.
 export type NotificationRow =
   | { kind: "shared"; id: string; service_id: string; service_name: string; created_at: string; seen_at: string | null }
   | {
-      kind: Exclude<NotificationKind, "service_shared">;
+      kind: NotificationKind;
       id: string;
       title: string;
       body: string;
@@ -86,13 +86,6 @@ export async function inviteMember(serviceId: string, email: string): Promise<{ 
     return { error: error.message };
   }
 
-  // Push only: the bell already lists Services the user was added to (from service_members).
-  await notify(
-    userId as string,
-    "service_shared",
-    { service_id: serviceId, service_name: (service as { name: string }).name, by_email: user.email ?? "Someone" },
-    { store: false },
-  );
   revalidateService(serviceId);
   return { member: data as MemberRow };
 }
@@ -179,12 +172,10 @@ export async function listNotifications(): Promise<NotificationRow[]> {
   type Notice = { id: number; kind: string; data: Record<string, unknown> | null; created_at: string; seen_at: string | null };
   const rest: NotificationRow[] = [];
   for (const n of (other.error ? [] : (other.data ?? [])) as Notice[]) {
-    // "service_shared" rows are never stored (the service_members item above covers them).
-    if (n.kind === "service_shared") continue;
     const message = describeNotification(n.kind, n.data);
     if (!message) continue;
     rest.push({
-      kind: n.kind as Exclude<NotificationKind, "service_shared">,
+      kind: n.kind as NotificationKind,
       id: `n:${n.id}`,
       ...message,
       created_at: n.created_at,

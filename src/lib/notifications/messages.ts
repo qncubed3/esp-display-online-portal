@@ -1,10 +1,9 @@
-// What each notification kind says and where it links. Shared by the push sender (notify.ts)
-// and the bell (listNotifications), so both show the same words. Names are stored in `data` at
-// the time of the change, so messages still read right after a rename or delete.
+// What each notification kind says and where it links, for the bell (listNotifications). Names are
+// stored in `data` at the time of the change, so messages still read right after a rename or delete.
+// "Added to a Service" isn't a kind: the bell derives it from service_members.
 
 export type NotificationKind =
   | "device_transferred"
-  | "service_shared"
   | "member_removed"
   | "member_left"
   | "device_subscribed"
@@ -15,8 +14,6 @@ export type NotificationKind =
 export interface NotificationData {
   /** A device was handed to you. */
   device_transferred: { device_id: string; device_name: string; from_email: string };
-  /** You were added to a Service (push only; the bell reads service_members). */
-  service_shared: { service_id: string; service_name: string; by_email: string };
   /** The owner removed you from their Service. */
   member_removed: { service_id: string; service_name: string; by_email: string };
   /** Someone left your Service. */
@@ -60,8 +57,6 @@ export function describeNotification(kind: string, raw: Record<string, unknown> 
   switch (kind) {
     case "device_transferred":
       return { title: "Device transferred to you", body: `${str(d.from_email, "Someone")} transferred ${device} to you.`, url: "/devices" };
-    case "service_shared":
-      return { title: "Service shared with you", body: `${str(d.by_email, "Someone")} added you to ${service}.`, url: serviceUrl };
     case "member_removed":
       return { title: "Removed from a service", body: `${str(d.by_email, "The owner")} removed you from ${service}.`, url: "/shared" };
     case "member_left":
