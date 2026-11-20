@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, KeyRound, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Check, Copy, FileCode2, KeyRound, Loader2, Plus, Trash2, X } from "lucide-react";
 import {
   addDevice,
   deleteDevice,
@@ -9,6 +9,7 @@ import {
   regenerateDeviceKey,
   type DeviceRow,
 } from "@/lib/devices/actions";
+import SetupFilesDialog from "./SetupFilesDialog";
 
 const ONLINE_MS = 2 * 60 * 1000;
 
@@ -47,7 +48,17 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
   );
 }
 
-function NewKeyCallout({ deviceName, keyValue, onClose }: { deviceName: string; keyValue: string; onClose: () => void }) {
+function NewKeyCallout({
+  deviceName,
+  keyValue,
+  onClose,
+  onSetupFiles,
+}: {
+  deviceName: string;
+  keyValue: string;
+  onClose: () => void;
+  onSetupFiles: () => void;
+}) {
   // Only rendered after a client-side action, so window is always available here.
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const snippet = `#define SERVICE_URL "${origin}/api/device/frame"\n#define DEVICE_KEY  "${keyValue}"`;
@@ -79,6 +90,17 @@ function NewKeyCallout({ deviceName, keyValue, onClose }: { deviceName: string; 
           <CopyButton text={snippet} />
         </div>
       </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-[#a0a0a0]">Or get the complete ESP32 firmware with this key filled in.</p>
+        <button
+          type="button"
+          onClick={onSetupFiles}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#3ecf8e]/50 bg-[#3ecf8e]/10 px-2.5 py-1.5 font-medium text-[#3ecf8e] hover:bg-[#3ecf8e]/20"
+        >
+          <FileCode2 size={14} /> Setup files
+        </button>
+      </div>
     </div>
   );
 }
@@ -91,6 +113,8 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
   const [newName, setNewName] = useState("");
   const [shownKey, setShownKey] = useState<{ name: string; key: string } | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // Setup files dialog: key is set when opened from the one-time key callout.
+  const [filesFor, setFilesFor] = useState<{ name: string; key?: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -198,7 +222,18 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
         </form>
       )}
 
-      {shownKey && <NewKeyCallout deviceName={shownKey.name} keyValue={shownKey.key} onClose={() => setShownKey(null)} />}
+      {shownKey && (
+        <NewKeyCallout
+          deviceName={shownKey.name}
+          keyValue={shownKey.key}
+          onClose={() => setShownKey(null)}
+          onSetupFiles={() => setFilesFor({ name: shownKey.name, key: shownKey.key })}
+        />
+      )}
+
+      {filesFor && (
+        <SetupFilesDialog deviceName={filesFor.name} deviceKey={filesFor.key} onClose={() => setFilesFor(null)} />
+      )}
 
       {error && <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-300">{error}</p>}
 
@@ -245,6 +280,14 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-1">
                       {busy === d.id && <Loader2 size={13} className="animate-spin text-[#a0a0a0]" />}
+                      <button
+                        type="button"
+                        onClick={() => setFilesFor({ name: d.name })}
+                        title="ESP32 firmware files for this device"
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
+                      >
+                        <FileCode2 size={13} /> Setup files
+                      </button>
                       <button
                         type="button"
                         onClick={() => onRegenerate(d)}
