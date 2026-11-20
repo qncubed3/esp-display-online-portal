@@ -16,9 +16,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // provider. Other errors are thrown as they are.
 export class ResilientProvider implements LlmProvider {
   readonly label: string;
+  readonly model: string;
 
   constructor(private providers: LlmProvider[]) {
     this.label = providers[0].label;
+    this.model = providers[0].model;
   }
 
   async complete(req: CompletionRequest): Promise<string> {
@@ -29,6 +31,7 @@ export class ResilientProvider implements LlmProvider {
         const remaining = req.timeoutMs - (Date.now() - started);
         if (remaining < MIN_ATTEMPT_MS) throw last ?? new ProviderError(`${provider.label}: timed out`, undefined, true);
         try {
+          req.onAttempt?.(provider.model);
           return await provider.complete({ ...req, timeoutMs: remaining });
         } catch (e) {
           if (!(e instanceof ProviderError)) throw e;

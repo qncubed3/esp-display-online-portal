@@ -1,15 +1,19 @@
-import { postJson, ProviderError, type CompletionRequest, type LlmProvider } from "./types";
+import { postSse, ProviderError, type CompletionRequest, type Effort, type LlmProvider } from "./types";
 
-// Google Gemini API (AI Studio key). Free tier available; see ai.google.dev for current limits.
+// Gemini's thinking levels for each effort choice ("minimal" is the closest to off).
+const THINKING_LEVEL: Record<Effort, string> = { off: "minimal", low: "low", medium: "medium", high: "high" };
+
+type Chunk = { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+
+// Google Gemini API (AI Studio key), streamed. Free tier available; see ai.google.dev for limits.
 export class GeminiProvider implements LlmProvider {
   readonly label: string;
-  // Minimal thinking keeps replies fast (Gemini 3 thinks a lot by default, enough to time the route
-  // out). Models that reject the setting get retried without it, and it stays off after that.
-  private lowThinking = true;
+  // Models that reject the thinking setting get retried without it, and it stays off after that.
+  private setThinking = true;
 
   constructor(
     private apiKey: string,
-    private model: string,
+    readonly model: string,
   ) {
     this.label = `gemini (${model})`;
   }
@@ -17,18 +21,20 @@ export class GeminiProvider implements LlmProvider {
   async complete(req: CompletionRequest): Promise<string> {
     const started = Date.now();
     try {
-      return await this.generate(req, this.lowThinking);
+      return await this.generate(req, this.setThinking);
     } catch (e) {
-      const rejected = this.lowThinking && e instanceof ProviderError && e.status === 400 && /thinking/i.test(e.message);
+      // Rejected before any text was streamed, so retrying is safe.
+      const rejected = this.setThinking && e instanceof ProviderError && e.status === 400 && /thinking/i.test(e.message);
       if (!rejected) throw e;
-      this.lowThinking = false;
+      this.setThinking = false;
       return this.generate({ ...req, timeoutMs: Math.max(1_000, req.timeoutMs - (Date.now() - started)) }, false);
     }
   }
 
-  private async generate({ system, messages, maxTokens, timeoutMs }: CompletionRequest, lowThinking: boolean): Promise<string> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
-    const body = (await postJson(
+  private async generate({ system, effort, messages, maxTokens, timeoutMs, onText }: CompletionRequest, setThinking: boolean): Promise<string> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:streamGenerateContent?alt=sse`;
+    let text = "";
+    await postSse(
       this.label,
       url,
       { "x-goog-api-key": this.apiKey },
@@ -37,15 +43,21 @@ export class GeminiProvider implements LlmProvider {
         contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
         generationConfig: {
           maxOutputTokens: maxTokens,
-          ...(lowThinking ? { thinkingConfig: { thinkingLevel: "minimal" } } : {}),
+          ...(setThinking ? { thinkingConfig: { thinkingLevel: THINKING_LEVEL[effort] } } : {}),
         },
       },
       timeoutMs,
-    )) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
-    // Skip thought-summary parts if the API includes any; only the answer is wanted.
-    return (body.candidates?.[0]?.content?.parts ?? [])
-      .filter((p) => !p.thought)
-      .map((p) => p.text ?? "")
-      .join("");
+      (data) => {
+        // Skip thought-summary parts if the API includes any; only the answer is wanted.
+        const delta = ((data as Chunk).candidates?.[0]?.content?.parts ?? [])
+          .filter((p) => !p.thought)
+          .map((p) => p.text ?? "")
+          .join("");
+        if (!delta) return;
+        text += delta;
+        onText?.(delta);
+      },
+    );
+    return text;
   }
 }

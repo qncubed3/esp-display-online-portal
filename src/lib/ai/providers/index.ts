@@ -5,7 +5,8 @@ import { OpenAiCompatibleProvider } from "./openai";
 import { ResilientProvider } from "./resilient";
 import type { LlmProvider } from "./types";
 
-export type { ChatMessage, LlmProvider } from "./types";
+export type { ChatMessage, Effort, LlmProvider } from "./types";
+export { EFFORTS } from "./types";
 export { ProviderError } from "./types";
 export { isBusyError } from "./resilient";
 

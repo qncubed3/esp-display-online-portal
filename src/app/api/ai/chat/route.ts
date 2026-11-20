@@ -1,11 +1,18 @@
 // In-editor AI chat for a Service.
-//   POST { serviceId, messages, code, rows, vars } -> { text, dataCode?, wire?, drawError? }
+//   GET -> { model } (the configured model, or null when AI isn't set up)
+//   POST { serviceId, messages, code, rows, vars, effort } -> newline-delimited JSON events:
+//     { type: "attempt", model }   a model starts answering; drop any text streamed so far
+//     { type: "text", delta }      reply text as it's written
+//     { type: "status", text }     e.g. while the Draw JSON is being repaired
+//     { type: "done", text, dataCode?, wire?, drawError?, model }
+//     { type: "error", error }
+//   Errors before the model is called (bad input, auth, rate limit) are plain JSON with a status.
 // `messages` is the chat so far (last one from the user); code/rows/vars are the editor's current,
 // unsaved state. The reply's code blocks come back separately so the editor can apply them.
 // Signed-in owners and members only (the service is read with the user's client, so RLS applies).
 
 import { buildChatSystemPrompt, parseReply, validateDraw, withEditorState } from "@/lib/ai/chat";
-import { getLlmProvider, isBusyError, ProviderError, type ChatMessage } from "@/lib/ai/providers";
+import { EFFORTS, getLlmProvider, isBusyError, ProviderError, type ChatMessage, type Effort } from "@/lib/ai/providers";
 import type { DrawRow } from "@/lib/draw/ops";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,14 +50,27 @@ function isMessage(m: unknown): m is ChatMessage {
   return !!o && (o.role === "user" || o.role === "assistant") && typeof o.content === "string";
 }
 
+function errorMessage(e: unknown): string {
+  if (e instanceof ProviderError && e.timedOut) return "The AI took too long to reply. Try again, or ask for a smaller change.";
+  if (isBusyError(e)) return "The AI model is busy right now (the provider is overloaded). Try again in a minute.";
+  const message = e instanceof Error ? e.message : "The AI request failed.";
+  return e instanceof ProviderError && e.status === 429 ? `The AI provider is rate limiting requests. ${message}` : message;
+}
+
+export async function GET() {
+  const provider = getLlmProvider();
+  return Response.json({ model: provider?.model ?? null }, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function POST(request: Request) {
-  let body: { serviceId?: unknown; messages?: unknown; code?: unknown; rows?: unknown; vars?: unknown };
+  let body: { serviceId?: unknown; messages?: unknown; code?: unknown; rows?: unknown; vars?: unknown; effort?: unknown };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const { serviceId, messages, code, rows, vars } = body;
+  const effort: Effort = EFFORTS.includes(body.effort as Effort) ? (body.effort as Effort) : "off";
   if (typeof serviceId !== "string" || !serviceId) return Response.json({ error: "serviceId is required" }, { status: 400 });
   if (!Array.isArray(messages) || !messages.length || !messages.every(isMessage) || messages.at(-1)!.role !== "user") {
     return Response.json({ error: "messages must be a non-empty chat ending with a user message" }, { status: 400 });
@@ -91,52 +111,68 @@ export async function POST(request: Request) {
   });
 
   const deadline = Date.now() + BUDGET_MS;
-  try {
-    let reply = parseReply(await provider.complete({ system, messages: chat, maxTokens: MAX_TOKENS, timeoutMs: BUDGET_MS }));
-    let draw = reply.drawText !== undefined ? validateDraw(reply.drawText) : undefined;
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: object) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      let answeredBy = provider.model;
+      try {
+        let reply = parseReply(
+          await provider.complete({
+            system,
+            effort,
+            messages: chat,
+            maxTokens: MAX_TOKENS,
+            timeoutMs: BUDGET_MS,
+            onAttempt: (model) => {
+              answeredBy = model;
+              send({ type: "attempt", model });
+            },
+            onText: (delta) => send({ type: "text", delta }),
+          }),
+        );
+        let draw = reply.drawText !== undefined ? validateDraw(reply.drawText) : undefined;
 
-    // One repair round when the Draw JSON doesn't validate: show the model its error.
-    if (draw && !draw.ok && deadline - Date.now() > MIN_REPAIR_MS) {
-      const retry = parseReply(
-        await provider.complete({
-          system,
-          messages: [
-            ...chat,
-            { role: "assistant", content: `${reply.text}\n\n\`\`\`json\n${reply.drawText}\n\`\`\`` },
-            { role: "user", content: `That Draw JSON is invalid: ${draw.error}\nSend the corrected complete json block only.` },
-          ],
-          maxTokens: MAX_TOKENS,
-          timeoutMs: deadline - Date.now(),
-        }),
-      );
-      if (retry.drawText !== undefined) {
-        const fixed = validateDraw(retry.drawText);
-        if (fixed.ok) draw = fixed;
+        // One repair round when the Draw JSON doesn't validate: show the model its error. Not streamed.
+        if (draw && !draw.ok && deadline - Date.now() > MIN_REPAIR_MS) {
+          send({ type: "status", text: "Fixing the Draw JSON…" });
+          const retry = parseReply(
+            await provider.complete({
+              system,
+              effort,
+              messages: [
+                ...chat,
+                { role: "assistant", content: `${reply.text}\n\n\`\`\`json\n${reply.drawText}\n\`\`\`` },
+                { role: "user", content: `That Draw JSON is invalid: ${draw.error}\nSend the corrected complete json block only.` },
+              ],
+              maxTokens: MAX_TOKENS,
+              timeoutMs: deadline - Date.now(),
+            }),
+          );
+          if (retry.drawText !== undefined) {
+            const fixed = validateDraw(retry.drawText);
+            if (fixed.ok) draw = fixed;
+          }
+        }
+
+        if (!reply.text && reply.dataCode === undefined && !draw) reply = { ...reply, text: "(The model sent an empty reply. Try rephrasing.)" };
+        send({
+          type: "done",
+          text: reply.text,
+          dataCode: reply.dataCode,
+          wire: draw?.ok ? draw.wire : undefined,
+          drawError: draw && !draw.ok ? draw.error : undefined,
+          model: answeredBy,
+        });
+      } catch (e) {
+        send({ type: "error", error: errorMessage(e) });
+      } finally {
+        controller.close();
       }
-    }
+    },
+  });
 
-    if (!reply.text && reply.dataCode === undefined && !draw) reply = { ...reply, text: "(The model sent an empty reply. Try rephrasing.)" };
-    return Response.json(
-      {
-        text: reply.text,
-        dataCode: reply.dataCode,
-        wire: draw?.ok ? draw.wire : undefined,
-        drawError: draw && !draw.ok ? draw.error : undefined,
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  } catch (e) {
-    if (e instanceof ProviderError && e.timedOut) {
-      return Response.json({ error: "The AI took too long to reply. Try again, or ask for a smaller change." }, { status: 504 });
-    }
-    if (isBusyError(e)) {
-      return Response.json(
-        { error: "The AI model is busy right now (the provider is overloaded). Try again in a minute." },
-        { status: 503 },
-      );
-    }
-    const status = e instanceof ProviderError && e.status === 429 ? 429 : 502;
-    const message = e instanceof Error ? e.message : "The AI request failed.";
-    return Response.json({ error: status === 429 ? `The AI provider is rate limiting requests. ${message}` : message }, { status });
-  }
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
+  });
 }

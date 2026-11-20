@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, ArrowUp, Code2, Loader2, Shapes, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { cn } from "@/components/ui/cn";
-import type { AiChatState } from "./useAiChat";
+import { EFFORT_OPTIONS, type AiChatState } from "./useAiChat";
 
 const SUGGESTIONS = [
   "Show the Bitcoin price from CoinGecko, big and centred",
@@ -14,13 +14,13 @@ const SUGGESTIONS = [
 // The AI assistant: the "AI" view of the Draw commands panel. Replies are applied to the editor straight away
 // (unsaved until Save & deploy); the latest change can be undone.
 export default function AiChat({ chat, headerActions }: { chat: AiChatState; /** Extra buttons in the header row. */ headerActions?: ReactNode }) {
-  const { entries, pending, send, undo, clear } = chat;
+  const { entries, pending, send, undo, clear, model, effort, setEffort } = chat;
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [entries.length, pending]);
+  }, [entries.length, pending, entries.at(-1)?.content, entries.at(-1)?.progress]);
 
   const lastApplied = entries.findLastIndex((e) => e.before && !e.undone);
 
@@ -33,9 +33,19 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
   return (
     <section aria-label="AI assistant" className="flex min-w-0 flex-col rounded-md border border-border bg-bg">
       <div className="flex h-9 items-center justify-between gap-2 border-b border-border px-3">
-        <h3 className="inline-flex items-center gap-1.5 text-[13px] font-medium">
-          <Sparkles size={14} className="text-accent" aria-hidden /> AI assistant
-        </h3>
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium">
+            <Sparkles size={14} className="text-accent" aria-hidden /> AI assistant
+          </h3>
+          {model && (
+            <span
+              className="min-w-0 truncate rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[11px] text-muted"
+              title={`Model: ${model}`}
+            >
+              {model}
+            </span>
+          )}
+        </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {entries.length > 0 && (
             <button
@@ -86,6 +96,11 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
           ) : (
             <div key={i} className="space-y-1.5">
               {e.content && <p className="whitespace-pre-wrap break-words text-[13px] text-fg">{e.content}</p>}
+              {e.streaming && (
+                <p className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+                  <Loader2 size={13} className="animate-spin" aria-hidden /> {e.progress ?? (e.content ? "Writing…" : "Thinking…")}
+                </p>
+              )}
               {e.changed && (
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                   {e.changed.data && (
@@ -114,44 +129,64 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
           ),
         )}
 
-        {pending && (
-          <p className="inline-flex items-center gap-1.5 text-[12px] text-muted">
-            <Loader2 size={13} className="animate-spin" aria-hidden /> Thinking…
-          </p>
-        )}
       </div>
 
       <form
-        className="relative border-t border-border p-2"
+        className="space-y-1.5 border-t border-border p-2"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          rows={2}
-          maxLength={4000}
-          placeholder="Ask for a change…"
-          aria-label="Message the AI assistant"
-          className="block min-h-[52px] w-full resize-y rounded-md border border-border bg-panel py-1.5 pl-2.5 pr-12 text-[13px] text-fg outline-none placeholder:text-muted focus:border-accent"
-        />
-        <button
-          type="submit"
-          disabled={!draft.trim() || pending}
-          aria-label="Send"
-          // Inside the text box, vertically centred (the form's padding is even top and bottom).
-          className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md bg-accent text-[#111] outline-none transition-[opacity,background-color] hover:bg-accent-hover focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-40"
-        >
-          {pending ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={15} />}
-        </button>
+        <div className="relative">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            rows={2}
+            maxLength={4000}
+            placeholder="Ask for a change…"
+            aria-label="Message the AI assistant"
+            className="block min-h-[52px] w-full resize-y rounded-md border border-border bg-panel py-1.5 pl-2.5 pr-12 text-[13px] text-fg outline-none placeholder:text-muted focus:border-accent"
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim() || pending}
+            aria-label="Send"
+            // Inside the text box, vertically centred.
+            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md bg-accent text-[#111] outline-none transition-[opacity,background-color] hover:bg-accent-hover focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-40"
+          >
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={15} />}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted">
+          <span title="How much the model thinks before answering. Off is fastest and cheapest; higher is more careful but slower.">
+            Thinking
+          </span>
+          <div role="radiogroup" aria-label="Thinking effort" className="inline-flex rounded-md border border-border bg-panel p-0.5">
+            {EFFORT_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={effort === o.value}
+                onClick={() => setEffort(o.value)}
+                className={cn(
+                  "rounded px-2 py-0.5 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent",
+                  effort === o.value ? "bg-panel-hover text-fg" : "hover:text-fg",
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <span className="ml-auto hidden sm:inline">Enter to send · Shift+Enter for a new line</span>
+        </div>
       </form>
     </section>
   );

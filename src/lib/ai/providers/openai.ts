@@ -7,13 +7,13 @@ export class OpenAiCompatibleProvider implements LlmProvider {
 
   constructor(
     private apiKey: string,
-    private model: string,
+    readonly model: string,
     private baseUrl: string,
   ) {
     this.label = `${new URL(baseUrl).hostname} (${model})`;
   }
 
-  async complete({ system, messages, maxTokens, timeoutMs }: CompletionRequest): Promise<string> {
+  async complete({ system, messages, maxTokens, timeoutMs, onText }: CompletionRequest): Promise<string> {
     const body = (await postJson(
       this.label,
       `${this.baseUrl.replace(/\/+$/, "")}/chat/completions`,
@@ -21,6 +21,9 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       { model: this.model, max_tokens: maxTokens, messages: [{ role: "system", content: system }, ...messages] },
       timeoutMs,
     )) as { choices?: { message?: { content?: string } }[] };
-    return body.choices?.[0]?.message?.content ?? "";
+    // Not streamed: the whole reply arrives at once. Effort isn't mapped (no common setting).
+    const text = body.choices?.[0]?.message?.content ?? "";
+    onText?.(text);
+    return text;
   }
 }
