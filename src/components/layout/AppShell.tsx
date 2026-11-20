@@ -4,6 +4,7 @@ import { ChevronRight, LogOut, Monitor } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import SidebarNav from "@/components/layout/SidebarNav";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export interface Crumb {
   label: string;
@@ -17,7 +18,8 @@ export default function AppShell({
   actions,
   children,
 }: {
-  email: string;
+  /** Undefined while loading (route loading.tsx files): shows a placeholder. */
+  email?: string;
   crumbs: Crumb[];
   actions?: ReactNode;
   children: ReactNode;
@@ -35,9 +37,13 @@ export default function AppShell({
         <SidebarNav />
 
         <div className="border-t border-border p-3">
-          <p className="mb-2 truncate text-[12px] text-muted" title={email}>
-            {email}
-          </p>
+          {email === undefined ? (
+            <Skeleton className="mb-3 mt-1 w-32" />
+          ) : (
+            <p className="mb-2 truncate text-[12px] text-muted" title={email}>
+              {email}
+            </p>
+          )}
           <form action={signOut}>
             <button
               type="submit"

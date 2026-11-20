@@ -26,3 +26,26 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 14px;
 }
+
+/* Loading placeholder: a grey pill with a highlight sweeping left to right. */
+.skeleton {
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #262626 0%, #262626 35%, #333333 50%, #262626 65%, #262626 100%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s linear infinite;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
