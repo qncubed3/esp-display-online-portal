@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, LayoutTemplate } from "lucide-react";
-import DevicePreview from "@/components/draw/DevicePreview";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/components/ui/cn";
-import { toWireOps } from "@/lib/draw/ops";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, toWireOps } from "@/lib/draw/ops";
+import { renderPreview } from "@/lib/draw/preview";
 import { TEMPLATES, type Template } from "@/lib/templates/catalog";
 
 export type LoadMode = "both" | "draw" | "data";
@@ -18,9 +18,26 @@ const MODES: { id: LoadMode; label: string; hint: string }[] = [
   { id: "data", label: "Data only", hint: "Keep my Draw rows" },
 ];
 
-// Previews are static, so build each template's ops once.
+// The template's screen with sample data, filling the card's width (no bezel or coordinates).
+function ScreenThumb({ t }: { t: Template }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (ctx) renderPreview(ctx, toWireOps(t.rows, t.sampleVars));
+  }, [t]);
+  return (
+    <canvas
+      ref={ref}
+      width={SCREEN_WIDTH}
+      height={SCREEN_HEIGHT}
+      aria-hidden
+      className="block w-full rounded-[3px] bg-black"
+      style={{ aspectRatio: `${SCREEN_WIDTH} / ${SCREEN_HEIGHT}`, imageRendering: "pixelated" }}
+    />
+  );
+}
+
 function TemplateCard({ t, selected, onSelect }: { t: Template; selected: boolean; onSelect(): void }) {
-  const ops = useMemo(() => toWireOps(t.rows, t.sampleVars), [t]);
   return (
     <button
       type="button"
@@ -28,23 +45,23 @@ function TemplateCard({ t, selected, onSelect }: { t: Template; selected: boolea
       aria-checked={selected}
       onClick={onSelect}
       className={cn(
-        "relative flex cursor-pointer flex-col overflow-hidden rounded-md border bg-panel text-left transition-colors outline-none",
+        "relative flex h-full cursor-pointer flex-col overflow-hidden rounded-md border bg-panel text-left transition-colors outline-none",
         "focus-visible:ring-2 focus-visible:ring-accent/50",
-        selected ? "border-accent" : "border-border hover:border-border-strong hover:bg-panel-hover",
+        selected ? "border-accent ring-1 ring-accent" : "border-border hover:border-border-strong hover:bg-panel-hover",
       )}
     >
       {selected && (
-        <span className="absolute right-2 top-2 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[#111]">
+        <span className="absolute right-2.5 top-2.5 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[#111] shadow">
           <Check size={12} strokeWidth={3} />
         </span>
       )}
-      <div className="pointer-events-none flex justify-center border-b border-border bg-bg px-3 pt-3">
-        <DevicePreview ops={ops} scale={0.6} cursor="pointer" />
+      <div className="border-b border-border bg-[#111] p-2.5">
+        <ScreenThumb t={t} />
       </div>
-      <div className="flex flex-1 flex-col p-3">
-        <span className="text-[13px] font-medium text-fg">{t.name}</span>
-        <span className="mt-1 line-clamp-3 text-[12px] text-muted">{t.description}</span>
-        <span className="mt-2 flex flex-wrap gap-1">
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <span className="text-[13px] font-medium leading-snug text-fg">{t.name}</span>
+        <span className="line-clamp-2 text-[12px] leading-relaxed text-muted">{t.description}</span>
+        <span className="mt-auto flex flex-wrap gap-1 pt-1.5">
           {t.apis.map((api) => (
             <Badge key={api}>{api}</Badge>
           ))}
@@ -60,6 +77,7 @@ export default function LoadTemplateDialog({
   hasCode,
   rowCount,
   onLoad,
+  initialTemplateId,
 }: {
   open: boolean;
   onClose(): void;
@@ -68,8 +86,13 @@ export default function LoadTemplateDialog({
   /** Number of Draw rows the Service currently has. */
   rowCount: number;
   onLoad(template: Template, mode: LoadMode): void;
+  /** Template to have selected when the dialog opens (e.g. arriving from the Templates page). */
+  initialTemplateId?: string | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (open && initialTemplateId) setSelectedId(initialTemplateId);
+  }, [open, initialTemplateId]);
   const [mode, setMode] = useState<LoadMode>("both");
   const selected = TEMPLATES.find((t) => t.id === selectedId) ?? null;
 
@@ -95,7 +118,7 @@ export default function LoadTemplateDialog({
       onClose={close}
       title="Load a template"
       // Fits the viewport: header and footer stay put, only the card grid scrolls.
-      className="max-h-[calc(100dvh-2rem)] max-w-4xl overflow-hidden open:flex open:flex-col"
+      className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl overflow-hidden open:flex open:flex-col"
       bodyClassName="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
       footer={
         <>
@@ -120,14 +143,14 @@ export default function LoadTemplateDialog({
             aria-label="Templates"
             className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-1"
           >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {TEMPLATES.map((t) => (
                 <TemplateCard key={t.id} t={t} selected={t.id === selectedId} onSelect={() => setSelectedId(t.id)} />
               ))}
             </div>
           </div>
 
-          <div className="shrink-0 space-y-3">
+          <div className="shrink-0 space-y-3 border-t border-border pt-4">
             <fieldset>
               <legend className="mb-2 text-[13px] font-medium text-fg">What to load</legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">

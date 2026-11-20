@@ -8,6 +8,7 @@ import DataEditor from "@/components/data/DataEditor";
 import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
 import DrawSection from "@/components/draw/DrawSection";
+import NextUpdateCountdown from "@/components/services/NextUpdateCountdown";
 import ActivitySection from "@/components/stats/ActivitySection";
 import LoadTemplateDialog, { type LoadMode } from "@/components/templates/LoadTemplateDialog";
 import { Button } from "@/components/ui/Button";
@@ -108,6 +109,17 @@ export default function ServiceEditor({
   // ---------- load a template (replaces Data and/or Draw locally; nothing is saved until deploy)
 
   const [templateOpen, setTemplateOpen] = useState(false);
+  // Arriving from the Templates page ("Load into a Service"): ?template=<id> opens the dialog with it picked.
+  const [templatePreset, setTemplatePreset] = useState<string | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get("template");
+    if (!id) return;
+    setTemplatePreset(id);
+    setTemplateOpen(true);
+    url.searchParams.delete("template");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, []);
   const loadTemplate = (t: Template, mode: LoadMode) => {
     const loadData = mode !== "draw";
     const loadDraw = mode !== "data";
@@ -195,6 +207,7 @@ export default function ServiceEditor({
         hasCode={code.trim() !== ""}
         rowCount={rows.length}
         onLoad={loadTemplate}
+        initialTemplateId={templatePreset}
       />
 
       {tab === "devices" && (
@@ -255,6 +268,9 @@ export default function ServiceEditor({
 
       <div className="sticky bottom-0 z-10 -mx-6 mt-auto border-t border-border bg-bg/95 px-6 py-3 backdrop-blur">
         <div className="flex items-center justify-end gap-3">
+          <div className="mr-auto">
+            <NextUpdateCountdown serviceId={serviceId} />
+          </div>
           {saveError ? (
             <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] text-[#ff8a8e]">
               <AlertCircle size={14} className="shrink-0" />

@@ -1,6 +1,7 @@
 import { LayoutTemplate } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import DevicePreview from "@/components/draw/DevicePreview";
+import LoadIntoServiceButton from "@/components/templates/LoadIntoServiceButton";
 import UseTemplateButton from "@/components/templates/UseTemplateButton";
 import { Badge } from "@/components/ui/Badge";
 import { toWireOps } from "@/lib/draw/ops";
@@ -35,7 +36,8 @@ export default function TemplatesPage() {
                     <Badge key={api}>{api}</Badge>
                   ))}
                 </div>
-                <div className="mt-4 flex flex-1 items-end justify-end">
+                <div className="mt-4 flex flex-1 items-end justify-end gap-2">
+                  <LoadIntoServiceButton templateId={t.id} templateName={t.name} />
                   <UseTemplateButton templateId={t.id} templateName={t.name} />
                 </div>
               </div>

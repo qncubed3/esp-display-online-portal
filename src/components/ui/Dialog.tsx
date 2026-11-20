@@ -31,7 +31,9 @@ export function Dialog({ open, onClose, title, children, footer, className, body
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       className={cn(
-        "m-auto w-full max-w-md rounded-md border border-border bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/60",
+        "m-auto w-full rounded-md border border-border bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/60",
+        // cn doesn't resolve conflicting classes, so only add the default width when none is given.
+        !className?.includes("max-w-") && "max-w-md",
         className,
       )}
     >
