@@ -91,24 +91,6 @@ export default function DrawSection(props: {
             </dl>
           )}
         </div>
-
-        <details className="group rounded-md border border-border bg-bg">
-          <summary className="cursor-pointer select-none px-3 py-2 text-muted outline-none hover:text-fg focus-visible:ring-1 focus-visible:ring-accent">
-            Export JSON <span className="text-[12px]">({ops.length} ops sent to the device)</span>
-          </summary>
-          <div className="relative border-t border-border">
-            <button
-              type="button"
-              onClick={() => void navigator.clipboard?.writeText(JSON.stringify(ops))}
-              className={`${btnCls} absolute right-2 top-2 text-[12px] text-muted hover:text-fg`}
-            >
-              Copy
-            </button>
-            <pre className="max-h-72 overflow-auto p-3 font-mono text-[12px] leading-5 text-fg">
-              {"[\n" + ops.map((o) => "  " + JSON.stringify(o)).join(",\n") + "\n]"}
-            </pre>
-          </div>
-        </details>
       </aside>
     </div>
   );
