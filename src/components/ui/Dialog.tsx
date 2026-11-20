@@ -31,9 +31,11 @@ export function Dialog({ open, onClose, title, children, footer, className, body
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       className={cn(
-        "m-auto w-full rounded-md border border-border bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/60",
-        // cn doesn't resolve conflicting classes, so only add the default width when none is given.
+        // Width leaves a 1rem gutter each side so the dialog never touches the viewport edge on phones.
+        "m-auto w-[calc(100%-2rem)] rounded-md border border-border bg-panel p-0 text-fg shadow-2xl backdrop:bg-black/60",
+        // cn doesn't resolve conflicting classes, so only add the defaults when the caller gives none.
         !className?.includes("max-w-") && "max-w-md",
+        !className?.includes("max-h-") && "max-h-[calc(100dvh-2rem)] overflow-y-auto",
         className,
       )}
     >
@@ -44,7 +46,7 @@ export function Dialog({ open, onClose, title, children, footer, className, body
         </button>
       </div>
       <div className={cn("px-4 py-4", bodyClassName)}>{children}</div>
-      {footer && <div className="flex justify-end gap-2 border-t border-border px-4 py-3">{footer}</div>}
+      {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">{footer}</div>}
     </dialog>
   );
 }
