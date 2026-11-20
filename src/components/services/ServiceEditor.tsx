@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode
 import { AlertCircle, Check, Loader2, Play, Rocket } from "lucide-react";
 import { saveService } from "@/app/services/[id]/actions";
 import DataEditor from "@/components/data/DataEditor";
+import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
 import DrawSection from "@/components/draw/DrawSection";
 import { Button } from "@/components/ui/Button";
@@ -138,6 +139,7 @@ export default function ServiceEditor({
           }
         />
         <DataEditor value={code} onChange={setCode} />
+        <VariablesPanel vars={vars} error={varsError} running={refreshing} />
       </Section>
 
       <DrawSection

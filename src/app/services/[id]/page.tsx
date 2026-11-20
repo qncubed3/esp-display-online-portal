@@ -29,7 +29,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
 
   return (
     <AppShell email={user.email ?? ""} crumbs={[{ label: "Services", href: "/" }, { label: service.name }]}>
-      <div className="mx-auto max-w-6xl px-6 py-6">
+      <div className="mx-auto max-w-6xl px-6 pt-6">
         <ServiceHeader serviceId={service.id} name={service.name} enabled={service.enabled} isOwner={isOwner} />
         <ServiceEditor
           serviceId={service.id}

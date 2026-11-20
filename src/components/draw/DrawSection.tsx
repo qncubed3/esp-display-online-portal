@@ -58,38 +58,20 @@ export default function DrawSection(props: {
           <DevicePreview ops={ops} />
         </div>
 
-        <div className="rounded-md border border-border bg-bg">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="font-medium">Variables</span>
-            <button type="button" onClick={onRefreshData} disabled={refreshing} className={btnCls}>
-              {refreshing ? (
-                <LoaderCircle size={14} className="animate-spin text-muted" aria-hidden />
-              ) : (
-                <RefreshCw size={14} className="text-muted" aria-hidden />
-              )}
-              {refreshing ? "Running…" : "Refresh data"}
-            </button>
-          </div>
+        <div className="flex items-center justify-end gap-3">
           {varsError && (
-            <div className="border-b border-border bg-red-950/20 px-3 py-2 text-[12px] text-red-300">
-              Data section failed: {varsError}. Variables are shown as empty in the preview.
-            </div>
+            <span className="min-w-0 truncate text-[12px] text-red-300" title={varsError}>
+              Data failed; variables are empty in the preview.
+            </span>
           )}
-          {varNames.length === 0 ? (
-            <div className="px-3 py-3 text-muted">{refreshing ? "Running the Data section…" : "No variables."}</div>
-          ) : (
-            <dl className="max-h-56 overflow-auto px-3 py-2 font-mono text-[12px]">
-              {varNames.map((name) => (
-                <div key={name} className="flex gap-2 py-0.5">
-                  <dt className="shrink-0 text-accent">{name}</dt>
-                  <span className="text-[#5a5a5a]">=</span>
-                  <dd className="min-w-0 truncate text-fg" title={String(vars[name])}>
-                    {JSON.stringify(vars[name])}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
+          <button type="button" onClick={onRefreshData} disabled={refreshing} className={btnCls}>
+            {refreshing ? (
+              <LoaderCircle size={14} className="animate-spin text-muted" aria-hidden />
+            ) : (
+              <RefreshCw size={14} className="text-muted" aria-hidden />
+            )}
+            {refreshing ? "Running…" : "Refresh data"}
+          </button>
         </div>
       </aside>
     </div>
