@@ -3,11 +3,9 @@
 // Device controls shared by the /devices page and a Service's Devices tab.
 
 import { useState } from "react";
-import { Check, Copy, FileCode2, Loader2, X } from "lucide-react";
+import { AlertCircle, Check, Copy, FileCode2, Loader2, X } from "lucide-react";
+import { Select } from "@/components/ui/Select";
 import { setDevicePollSeconds, setDeviceService, type SubscribableService } from "@/lib/devices/actions";
-
-const selectClass =
-  "h-7 max-w-[14rem] cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none hover:border-[#3e3e3e] focus:border-[#3e3e3e] disabled:cursor-default disabled:opacity-60";
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -91,32 +89,35 @@ export function NewKeyCallout({
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
+// Fixed 14px slot beside a dropdown, so the row doesn't shift as the state changes.
 function SaveIndicator({ state, error }: { state: SaveState; error?: string | null }) {
-  if (state === "saving") return <Loader2 size={14} className="shrink-0 animate-spin text-[#a0a0a0]" aria-label="Saving" />;
-  if (state === "saved") return <Check size={14} className="shrink-0 text-[#3ecf8e]" aria-label="Saved" />;
-  if (state === "error")
-    return (
-      <span className="text-[12px] text-[#ff8a8e]" title={error ?? undefined}>
-        Couldn&apos;t save
-      </span>
-    );
-  return null;
+  return (
+    <span className="inline-flex w-3.5 shrink-0 items-center justify-center" role="status" aria-live="polite">
+      {state === "saving" && <Loader2 size={14} className="animate-spin text-[#a0a0a0]" aria-label="Saving" />}
+      {state === "saved" && <Check size={14} className="text-[#3ecf8e]" aria-label="Saved" />}
+      {state === "error" && (
+        <span title={error ? `Couldn't save: ${error}` : "Couldn't save"} className="inline-flex">
+          <AlertCircle size={14} className="text-[#ff8a8e]" aria-label="Couldn't save" />
+        </span>
+      )}
+    </span>
+  );
 }
 
 // Seconds between device polls. Each poll is one Vercel function call (Hobby: ~1M/month).
 const POLL_OPTIONS: { value: number; label: string }[] = [
-  { value: 15, label: "Every 15 s" },
-  { value: 30, label: "Every 30 s" },
-  { value: 60, label: "Every minute" },
-  { value: 120, label: "Every 2 min" },
-  { value: 300, label: "Every 5 min" },
-  { value: 600, label: "Every 10 min" },
-  { value: 1800, label: "Every 30 min" },
-  { value: 3600, label: "Every hour" },
+  { value: 15, label: "15 s" },
+  { value: 30, label: "30 s" },
+  { value: 60, label: "1 min" },
+  { value: 120, label: "2 min" },
+  { value: 300, label: "5 min" },
+  { value: 600, label: "10 min" },
+  { value: 1800, label: "30 min" },
+  { value: 3600, label: "1 hour" },
 ];
 
 export function pollLabel(seconds: number): string {
-  return POLL_OPTIONS.find((o) => o.value === seconds)?.label ?? `Every ${seconds} s`;
+  return POLL_OPTIONS.find((o) => o.value === seconds)?.label ?? `${seconds} s`;
 }
 
 // Per-device dropdown. Saves as soon as it changes; the device picks it up on its next poll.
@@ -139,15 +140,20 @@ export function PollFrequency({ deviceId, initial }: { deviceId: string; initial
   }
 
   return (
-    <label className="flex items-center gap-2" title="How often this device asks for a new screen. Each poll counts towards Vercel's free-tier limit.">
-      <span className="sr-only">Poll frequency</span>
-      <select value={value} onChange={(e) => void change(Number(e.target.value))} disabled={state === "saving"} className={selectClass}>
+    <label className="flex items-center gap-1.5" title="How often this device asks for a new screen. Each poll counts towards Vercel's free-tier limit.">
+      <span className="sr-only">Update frequency</span>
+      <Select
+        value={value}
+        onChange={(e) => void change(Number(e.target.value))}
+        disabled={state === "saving"}
+        className="w-28 shrink-0"
+      >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
       <SaveIndicator state={state} />
     </label>
   );
@@ -229,11 +235,16 @@ export function ServiceSelect({
   }
 
   return (
-    <label className="flex items-center gap-2" title="The Service this device shows. Changes apply on the device's next poll.">
+    <label className="flex items-center gap-1.5" title="The Service this device shows. Changes apply on the device's next poll.">
       <span className="sr-only">Service</span>
-      <select value={value} onChange={(e) => void change(e.target.value)} disabled={state === "saving"} className={selectClass}>
+      <Select
+        value={value}
+        onChange={(e) => void change(e.target.value)}
+        disabled={state === "saving"}
+        className="w-[13.5rem] shrink-0"
+      >
         <ServiceOptions services={services} extra={known ? null : { id: value, label: "Service you can't access" }} />
-      </select>
+      </Select>
       <SaveIndicator state={state} error={error} />
     </label>
   );
@@ -270,22 +281,23 @@ export function AddDeviceForm({
         placeholder="Device name, e.g. Kitchen display"
         aria-label="Device name"
         maxLength={100}
-        className="min-w-[12rem] flex-1 rounded-md border border-[#2e2e2e] bg-[#161616] px-2.5 py-1.5 text-[#ededed] placeholder:text-[#6b6b6b] focus:border-[#3ecf8e] focus:outline-none"
+        className="h-8 min-w-[12rem] flex-1 rounded-md border border-[#2e2e2e] bg-[#161616] px-2.5 text-[#ededed] placeholder:text-[#6b6b6b] focus:border-[#3ecf8e] focus:outline-none"
       />
       {services && (
-        <select
+        <Select
+          size="md"
           value={serviceId}
           onChange={(e) => setServiceId(e.target.value)}
           aria-label="Service"
-          className="h-[32px] max-w-[16rem] cursor-pointer rounded-md border border-[#2e2e2e] bg-[#161616] px-2 text-[#ededed] outline-none hover:border-[#3e3e3e] focus:border-[#3ecf8e]"
+          className="w-[14rem] shrink-0"
         >
           <ServiceOptions services={services} />
-        </select>
+        </Select>
       )}
       <button
         type="submit"
         disabled={!name.trim() || busy}
-        className="inline-flex items-center gap-1.5 rounded-md bg-[#3ecf8e] px-2.5 py-1.5 font-medium text-[#0f0f0f] hover:bg-[#36b87e] disabled:opacity-50"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#3ecf8e] px-2.5 font-medium text-[#0f0f0f] hover:bg-[#36b87e] disabled:opacity-50"
       >
         {busy && <Loader2 size={13} className="animate-spin" />}
         Create
@@ -293,7 +305,7 @@ export function AddDeviceForm({
       <button
         type="button"
         onClick={onCancel}
-        className="rounded-md border border-[#2e2e2e] px-2.5 py-1.5 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
+        className="h-8 rounded-md border border-[#2e2e2e] px-2.5 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
       >
         Cancel
       </button>

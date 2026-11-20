@@ -18,6 +18,8 @@ import {
   type ServiceDeviceRow,
   type SubscribableService,
 } from "@/lib/devices/actions";
+import { Select } from "@/components/ui/Select";
+import LivePreviewButton from "./LivePreviewButton";
 import SetupFilesDialog from "./SetupFilesDialog";
 import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect, pollLabel } from "./DeviceControls";
 
@@ -53,11 +55,11 @@ function SubscribeDevice({
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#2e2e2e] bg-[#1c1c1c] px-3 py-2.5">
       <span className="text-[#a0a0a0]">Subscribe a device</span>
-      <select
+      <Select
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
         aria-label="Device to move to this Service"
-        className="h-7 max-w-[20rem] cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none hover:border-[#3e3e3e] focus:border-[#3e3e3e]"
+        className="w-[20rem] max-w-full"
       >
         <option value="">Choose one of your devices…</option>
         {devices.map((d) => (
@@ -65,7 +67,7 @@ function SubscribeDevice({
             {d.name} {d.service_id ? `(on ${d.service_name ?? "another Service"})` : "(no service)"}
           </option>
         ))}
-      </select>
+      </Select>
       <button
         type="button"
         disabled={!device || busy}
@@ -75,7 +77,7 @@ function SubscribeDevice({
             setSelected("");
           }
         }}
-        className="inline-flex items-center gap-1.5 rounded-md border border-[#2e2e2e] bg-[#232323] px-2.5 py-1 text-[#ededed] hover:bg-[#2a2a2a] disabled:opacity-50"
+        className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[#2e2e2e] bg-[#232323] px-2.5 text-[#ededed] hover:bg-[#2a2a2a] disabled:opacity-50"
       >
         {busy ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />} Move here
       </button>
@@ -208,12 +210,14 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
       <div className="overflow-x-auto rounded-md border border-[#2e2e2e] bg-[#1c1c1c]">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-[#2e2e2e] text-[12px] text-[#a0a0a0]">
+            <tr className="whitespace-nowrap border-b border-[#2e2e2e] text-[12px] text-[#a0a0a0]">
               <th className="px-3 py-2 font-normal">Name</th>
               <th className="px-3 py-2 font-normal">Last seen</th>
               <th className="px-3 py-2 font-normal">Service</th>
-              <th className="px-3 py-2 font-normal">Polls</th>
-              <th className="w-px px-3 py-2" />
+              <th className="px-3 py-2 font-normal">Update frequency</th>
+              <th className="w-px px-3 py-2">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -252,7 +256,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                   <td className="whitespace-nowrap px-3 py-2 text-[#a0a0a0]" title={d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : undefined}>
                     {relativeTime(d.last_seen_at, now)}
                   </td>
-                  <td className="px-3 py-1.5">
+                  <td className="whitespace-nowrap px-3 py-1.5">
                     {d.mine ? (
                       <ServiceSelect
                         key={d.service_id ?? ""}
@@ -272,10 +276,11 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                       <span className="text-[#a0a0a0]">{pollLabel(d.poll_seconds ?? 30)}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-1.5">
                     {d.mine && (
                       <div className="flex items-center justify-end gap-1">
                         {busy === d.id && <Loader2 size={13} className="animate-spin text-[#a0a0a0]" />}
+                        <LivePreviewButton deviceId={d.id} deviceName={d.name} />
                         <button
                           type="button"
                           onClick={() => setFilesFor({ name: d.name })}

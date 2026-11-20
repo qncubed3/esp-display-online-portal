@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Cpu, ExternalLink, FileCode2, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import LivePreviewButton from "@/components/devices/LivePreviewButton";
 import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
 import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
@@ -219,11 +220,11 @@ export default function DeviceList({
 
       <div className="overflow-x-auto rounded-md border border-border bg-panel">
         <table className="w-full text-left text-[13px]">
-          <thead className="border-b border-border text-[12px] text-muted">
+          <thead className="whitespace-nowrap border-b border-border text-[12px] text-muted">
             <tr>
               <th className="px-4 py-2 font-normal">Device</th>
               <th className="px-4 py-2 font-normal">Service</th>
-              <th className="px-4 py-2 font-normal">Polls</th>
+              <th className="px-4 py-2 font-normal">Update frequency</th>
               <th className="px-4 py-2 font-normal">Last seen</th>
               <th className="px-4 py-2 font-normal">Firmware</th>
               <th className="px-4 py-2 font-normal">WiFi</th>
@@ -248,7 +249,7 @@ export default function DeviceList({
                     <span className="truncate font-medium">{d.name}</span>
                   </span>
                 </td>
-                <td className="px-4 py-1.5">
+                <td className="whitespace-nowrap px-4 py-1.5">
                   <span className="flex items-center gap-1">
                     <ServiceSelect
                       key={d.serviceId ?? ""}
@@ -257,7 +258,7 @@ export default function DeviceList({
                       services={services}
                       onChanged={() => router.refresh()}
                     />
-                    {d.serviceId && d.serviceName && (
+                    {d.serviceId && d.serviceName ? (
                       <Link
                         href={`/services/${d.serviceId}`}
                         title={`Open ${d.serviceName}${d.shared ? " (shared with you)" : ""}`}
@@ -266,6 +267,9 @@ export default function DeviceList({
                       >
                         <ExternalLink size={12} />
                       </Link>
+                    ) : (
+                      // Same width as the link, so the columns line up row to row.
+                      <span className="w-6 shrink-0" aria-hidden />
                     )}
                   </span>
                 </td>
@@ -294,6 +298,7 @@ export default function DeviceList({
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                     {busy === d.id && <Loader2 size={13} className="animate-spin text-muted" />}
+                    <LivePreviewButton deviceId={d.id} deviceName={d.name} />
                     <button
                       type="button"
                       onClick={() => setFilesFor({ name: d.name })}

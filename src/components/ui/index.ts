@@ -4,3 +4,4 @@ export { Badge, type BadgeProps } from "./Badge";
 export { Dialog, type DialogProps } from "./Dialog";
 export { Toggle, type ToggleProps } from "./Toggle";
 export { cn } from "./cn";
+export { Select, type SelectProps, type SelectSize } from "./Select";

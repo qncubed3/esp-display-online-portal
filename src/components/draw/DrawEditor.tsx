@@ -7,10 +7,9 @@ import {
   useState,
   type DragEvent,
   type KeyboardEvent,
-  type ReactNode,
-  type SelectHTMLAttributes,
 } from "react";
-import { ChevronDown, Copy, GripVertical, Trash2 } from "lucide-react";
+import { Copy, GripVertical, Trash2 } from "lucide-react";
+import { Select } from "@/components/ui/Select";
 import { OPS, OP_BY_NAME, SWATCHES, newRow, type DrawRow, type Field } from "@/lib/draw/ops";
 
 export interface DrawEditorProps {
@@ -27,19 +26,6 @@ const inputCls =
   "h-7 rounded-md border border-[#2e2e2e] bg-[#161616] px-2 text-[13px] text-[#ededed] outline-none placeholder:text-[#5a5a5a] hover:border-[#3e3e3e] focus:border-[#3ecf8e] focus:ring-1 focus:ring-[#3ecf8e]/30";
 const iconBtnCls =
   "inline-flex h-7 w-7 items-center justify-center rounded-md text-[#a0a0a0] outline-none hover:bg-[#2a2a2a] hover:text-[#ededed] focus-visible:ring-1 focus-visible:ring-[#3ecf8e]";
-
-// Native select with a custom chevron. h-7 (28px) and a 14px icon leave 7px above and below it,
-// so the icon sits 7px from the right edge too; pr-7 keeps the text clear of it.
-export function Select({ className = "", children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode }) {
-  return (
-    <div className={`relative ${className}`}>
-      <select {...rest} className={`${inputCls} w-full cursor-pointer appearance-none pr-7`}>
-        {children}
-      </select>
-      <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-[7px] top-1/2 -translate-y-1/2 text-muted" />
-    </div>
-  );
-}
 
 export function OpSelect({ value, onChange, className = "", label }: { value: string; onChange(op: string): void; className?: string; label: string }) {
   return (
