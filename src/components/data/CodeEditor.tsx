@@ -2,6 +2,7 @@
 
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
+import { json } from "@codemirror/lang-json";
 import { HighlightStyle, indentUnit, syntaxHighlighting } from "@codemirror/language";
 import { Decoration, EditorView, MatchDecorator, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
@@ -95,16 +96,24 @@ const builtins = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
-const extensions = [javascript(), indentUnit.of("  "), syntaxHighlighting(highlight), builtins, theme];
+const shared = [indentUnit.of("  "), syntaxHighlighting(highlight), theme];
+const extensionsFor = {
+  javascript: [javascript(), builtins, ...shared],
+  json: [json(), ...shared],
+};
+
+export type CodeLanguage = keyof typeof extensionsFor;
 
 export default function CodeEditor({
   value,
   onChange,
   placeholder,
+  language = "javascript",
 }: {
   value: string;
   onChange(v: string): void;
   placeholder?: string;
+  language?: CodeLanguage;
 }) {
   return (
     <CodeMirror
@@ -112,7 +121,7 @@ export default function CodeEditor({
       onChange={onChange}
       placeholder={placeholder}
       theme="none"
-      extensions={extensions}
+      extensions={extensionsFor[language]}
       indentWithTab
       basicSetup={{
         tabSize: 2,

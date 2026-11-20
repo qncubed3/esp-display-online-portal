@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LoaderCircle, Plus, RefreshCw } from "lucide-react";
+import { Braces, List, LoaderCircle, Plus, RefreshCw } from "lucide-react";
+import AiHelperButton from "@/components/ai/AiHelperButton";
+import { buildDrawSkill } from "@/lib/ai/skill";
 import { newRow, toWireOps, type DrawRow } from "@/lib/draw/ops";
 import DevicePreview from "./DevicePreview";
+import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
 
 const btnCls =
@@ -22,6 +25,7 @@ export default function DrawSection(props: {
   const { rows, onChange, vars, varsError, refreshing, onRefreshData } = props;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOp, setAddOp] = useState("drawString");
+  const [mode, setMode] = useState<"rows" | "json">("rows");
 
   const ops = useMemo(() => toWireOps(rows, vars), [rows, vars]);
   const varNames = useMemo(() => Object.keys(vars).sort(), [vars]);
@@ -43,14 +47,48 @@ export default function DrawSection(props: {
           <span className="text-muted">
             {rows.length} {rows.length === 1 ? "command" : "commands"}
           </span>
-          <div className="ml-auto flex items-center gap-2">
-            <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="w-[200px]" />
-            <button type="button" onClick={add} className={btnCls}>
-              <Plus size={14} className="text-accent" aria-hidden /> Add row
-            </button>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <AiHelperButton
+              buildSkill={() => buildDrawSkill(vars)}
+              title="AI helper: design the screen"
+              fileName="SKILL.md"
+              intro="Describe the screen you want, then paste the JSON it returns into the JSON editor."
+            />
+            <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
+              {(
+                [
+                  ["rows", "Rows", List],
+                  ["json", "JSON", Braces],
+                ] as const
+              ).map(([m, label, Icon]) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={mode === m}
+                  onClick={() => setMode(m)}
+                  className={`inline-flex items-center gap-1.5 rounded px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
+                    mode === m ? "bg-panel-hover text-fg" : "text-muted hover:text-fg"
+                  }`}
+                >
+                  <Icon size={13} aria-hidden /> {label}
+                </button>
+              ))}
+            </div>
+            {mode === "rows" && (
+              <>
+                <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="w-[200px]" />
+                <button type="button" onClick={add} className={btnCls}>
+                  <Plus size={14} className="text-accent" aria-hidden /> Add row
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
+        {mode === "rows" ? (
+          <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
+        ) : (
+          <DrawJsonEditor rows={rows} onChange={onChange} />
+        )}
       </section>
 
       <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">

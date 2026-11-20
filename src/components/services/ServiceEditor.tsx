@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { AlertCircle, Check, Loader2, Play, Rocket } from "lucide-react";
 import { saveService } from "@/app/services/[id]/actions";
+import AiHelperButton from "@/components/ai/AiHelperButton";
 import DataEditor from "@/components/data/DataEditor";
 import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
 import DrawSection from "@/components/draw/DrawSection";
 import ActivitySection from "@/components/stats/ActivitySection";
 import { Button } from "@/components/ui/Button";
+import { buildAiSkill } from "@/lib/ai/skill";
 import type { DrawRow } from "@/lib/draw/ops";
 
 type Vars = Record<string, string | number | boolean>;
@@ -135,10 +137,23 @@ export default function ServiceEditor({
             </>
           }
           actions={
-            <Button size="sm" onClick={() => void refreshData()} disabled={refreshing} title="Run the Data code and refresh the preview">
-              {refreshing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-              Run
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <AiHelperButton
+                buildSkill={buildAiSkill}
+                title="AI helper: build this service"
+                fileName="SKILL.md"
+                intro={
+                  <>
+                    Copy this into Claude (or any AI), then tell it your API URLs and what you want shown. It replies with
+                    JavaScript to paste into Data and a JSON array to paste into Draw&apos;s JSON editor.
+                  </>
+                }
+              />
+              <Button size="sm" onClick={() => void refreshData()} disabled={refreshing} title="Run the Data code and refresh the preview">
+                {refreshing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                Run
+              </Button>
+            </div>
           }
         />
         <DataEditor value={code} onChange={setCode} />
