@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useEffect,
   useRef,
   useState,
@@ -57,7 +58,17 @@ export function OpSelect({ value, onChange, className = "", label }: { value: st
 }
 
 // Integer field: accepts numbers or text containing {var}.
-function IntInput({ field, value, onChange }: { field: Field; value: string | number; onChange(v: string | number): void }) {
+function IntInput({
+  field,
+  value,
+  onChange,
+  className,
+}: {
+  field: Field;
+  value: string | number;
+  onChange(v: string | number): void;
+  className?: string; // replaces the default width
+}) {
   const str = String(value ?? "");
   const isVar = /[{}]/.test(str);
   return (
@@ -78,12 +89,23 @@ function IntInput({ field, value, onChange }: { field: Field; value: string | nu
           onChange((Number(str) || 0) + step);
         }
       }}
-      className={`${inputCls} ${isVar ? "w-28 text-[#3ecf8e]" : "w-14"} tabular-nums`}
+      className={`${inputCls} ${className ?? (isVar ? "w-28" : "w-14")} ${isVar ? "text-[#3ecf8e]" : ""} tabular-nums`}
     />
   );
 }
 
-function ColorInput({ field, value, onChange }: { field: Field; value: string | number; onChange(v: string): void }) {
+// `compact`: swatch-only button (name in the tooltip), popover opens to the left; used on the card's first line.
+function ColorInput({
+  field,
+  value,
+  onChange,
+  compact,
+}: {
+  field: Field;
+  value: string | number;
+  onChange(v: string): void;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const str = String(value ?? "");
@@ -118,7 +140,9 @@ function ColorInput({ field, value, onChange }: { field: Field; value: string | 
         title={`${field.label}: ${none ? "none" : name ?? str}`}
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex h-7 items-center gap-1.5 rounded-md border border-[#2e2e2e] bg-[#161616] px-1.5 text-[12px] text-[#a0a0a0] outline-none hover:border-[#3e3e3e] focus-visible:border-[#3ecf8e]"
+        className={`flex h-7 items-center gap-1.5 rounded-md border border-[#2e2e2e] bg-[#161616] text-[12px] text-[#a0a0a0] outline-none hover:border-[#3e3e3e] focus-visible:border-[#3ecf8e] ${
+          compact ? "w-7 justify-center" : "px-1.5"
+        }`}
       >
         <span
           className="h-4 w-4 rounded-sm border border-[#3e3e3e]"
@@ -128,10 +152,12 @@ function ColorInput({ field, value, onChange }: { field: Field; value: string | 
               : { background: isHex ? str : "#2a2a2a" }
           }
         />
-        <span className="max-w-[72px] truncate">{none ? "none" : name ?? str}</span>
+        {!compact && <span className="max-w-[72px] truncate">{none ? "none" : name ?? str}</span>}
       </button>
       {open && (
-        <div className="absolute left-0 top-8 z-30 w-[188px] rounded-md border border-[#2e2e2e] bg-[#1c1c1c] p-2 shadow-xl">
+        <div
+          className={`absolute ${compact ? "right-0" : "left-0"} top-8 z-30 w-[188px] rounded-md border border-[#2e2e2e] bg-[#1c1c1c] p-2 shadow-xl`}
+        >
           <div className="mb-1 text-[11px] uppercase tracking-wide text-[#a0a0a0]">{field.label}</div>
           <div className="grid grid-cols-6 gap-1">
             {SWATCHES.map((s) => (
@@ -238,7 +264,17 @@ function TextInput({ field, value, onChange, variables }: { field: Field; value:
   );
 }
 
-function SelectInput({ field, value, onChange }: { field: Field; value: string | number; onChange(v: string | number): void }) {
+function SelectInput({
+  field,
+  value,
+  onChange,
+  className,
+}: {
+  field: Field;
+  value: string | number;
+  onChange(v: string | number): void;
+  className?: string;
+}) {
   const opts = field.options ?? [];
   const str = String(value ?? "");
   const known = opts.some((o) => String(o.value) === str);
@@ -246,6 +282,7 @@ function SelectInput({ field, value, onChange }: { field: Field; value: string |
     <Select
       aria-label={field.label}
       title={field.label}
+      className={className}
       value={str}
       onChange={(e) => {
         const o = opts.find((o) => String(o.value) === e.target.value);
@@ -264,22 +301,102 @@ function SelectInput({ field, value, onChange }: { field: Field; value: string |
 
 function FieldInput(props: { field: Field; value: string | number; onChange(v: string | number): void; variables: string[] }) {
   const { field } = props;
+  const p = props;
   const input =
     field.type === "int" ? (
-      <IntInput {...props} />
+      <IntInput {...p} />
     ) : field.type === "color" ? (
-      <ColorInput {...props} />
+      <ColorInput {...p} />
     ) : field.type === "select" ? (
-      <SelectInput {...props} />
+      <SelectInput {...p} />
     ) : (
-      <TextInput {...props} />
+      <TextInput {...p} />
     );
   return (
-    <div className={`flex items-center gap-1 ${field.type === "text" ? "min-w-[180px] flex-1" : ""}`}>
+    <div
+      className={`flex items-center gap-1 ${
+        field.type === "text" ? "min-w-[180px] flex-1" : "shrink-0"
+      }`}
+    >
       {field.type !== "text" && <span className="text-[11px] text-[#a0a0a0]">{field.label.replace(/^(Width|Height|Radius)$/, (m) => m[0])}</span>}
       {input}
     </div>
   );
+}
+
+// Params layout: each line is a short label then up to three fields in fixed grid columns, so X fields
+// line up under X fields, Y under Y, and the extra column (radius, font...) under itself across lines.
+// A line with `span` lets its field fill the rest of the line. Colour fields go on the card's first line
+// instead; any field not placed here falls back to the plain wrapping row below the grid.
+type ParamLine = { label: string; keys: string[]; span?: boolean };
+const POS: ParamLine = { label: "Position", keys: ["x", "y"] };
+const RECT: ParamLine[] = [POS, { label: "Size", keys: ["w", "h"] }];
+const ROUND_RECT: ParamLine[] = [POS, { label: "Size", keys: ["w", "h", "r"] }];
+const CIRCLE: ParamLine[] = [{ label: "Centre", keys: ["x", "y", "r"] }];
+const TRIANGLE: ParamLine[] = [
+  { label: "Point 1", keys: ["x0", "y0"] },
+  { label: "Point 2", keys: ["x1", "y1"] },
+  { label: "Point 3", keys: ["x2", "y2"] },
+];
+const LAYOUT: Record<string, ParamLine[]> = {
+  drawPixel: [POS],
+  drawLine: [
+    { label: "Start", keys: ["x0", "y0"] },
+    { label: "End", keys: ["x1", "y1"] },
+  ],
+  drawFastHLine: [POS, { label: "Length", keys: ["w"] }],
+  drawFastVLine: [POS, { label: "Length", keys: ["h"] }],
+  drawRect: RECT,
+  fillRect: RECT,
+  drawRoundRect: ROUND_RECT,
+  fillRoundRect: ROUND_RECT,
+  drawCircle: CIRCLE,
+  fillCircle: CIRCLE,
+  drawTriangle: TRIANGLE,
+  fillTriangle: TRIANGLE,
+  drawString: [
+    { label: "Text", keys: ["text"], span: true },
+    { label: "Position", keys: ["x", "y", "font"] },
+  ],
+};
+
+// "X0" -> "X", "Width" -> "W", "Radius" -> "R".
+const prefixOf = (f: Field) => f.label.replace(/\d+$/, "").charAt(0).toUpperCase();
+
+// One field in the params grid. col: 1 = X column, 2 = Y column, 3 = extra column.
+function GridField(props: {
+  field: Field;
+  value: string | number;
+  onChange(v: string | number): void;
+  variables: string[];
+  span?: boolean;
+  col: number;
+}) {
+  const { field, value, onChange, variables, span, col } = props;
+  if (field.type === "text" || span) {
+    return (
+      <div className="col-[2/-1] flex min-w-0">
+        <FieldInput field={field} value={value} onChange={onChange} variables={variables} />
+      </div>
+    );
+  }
+  if (field.type === "int") {
+    // X/Y columns fill their cell; the extra column gets the same width, left-aligned.
+    return (
+      <div className={`relative min-w-0 ${col === 3 ? "w-[84px] justify-self-start" : ""}`}>
+        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-[#5a5a5a]">{prefixOf(field)}</span>
+        <IntInput field={field} value={value} onChange={onChange} className="w-full pl-6" />
+      </div>
+    );
+  }
+  if (field.type === "select") {
+    return (
+      <div className={`min-w-0 ${col === 3 ? "justify-self-start" : ""}`}>
+        <SelectInput field={field} value={value} onChange={onChange} />
+      </div>
+    );
+  }
+  return <FieldInput field={field} value={value} onChange={onChange} variables={variables} />;
 }
 
 // Changing type: new op's defaults, keeping values whose keys match.
@@ -394,6 +511,15 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
         const def = OP_BY_NAME[row.op];
         const selected = sel === row.id;
         const dragging = dragId === row.id;
+        const fields = def?.fields ?? [];
+        const colorFields = fields.filter((f) => f.type === "color");
+        const byKey = new Map(fields.map((f) => [f.key, f]));
+        const lines = (LAYOUT[row.op] ?? [])
+          .map((l) => ({ ...l, fields: l.keys.map((k) => byKey.get(k)).filter((f): f is Field => !!f) }))
+          .filter((l) => l.fields.length > 0);
+        const placed = new Set(lines.flatMap((l) => l.fields.map((f) => f.key)));
+        const rest = fields.filter((f) => f.type !== "color" && !placed.has(f.key));
+        const setArg = (key: string, v: string | number) => update(row.id, (r) => ({ ...r, args: { ...r.args, [key]: v } }));
         return (
           <li
             key={row.id}
@@ -423,18 +549,6 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
             {dropAt === rows.length && i === rows.length - 1 && indicator("bottom")}
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                data-handle
-                aria-label={`Row ${i + 1}: drag to reorder, or Alt+Up/Down`}
-                title="Drag to reorder (Alt+↑/↓)"
-                onPointerDown={() => setArmed(row.id)}
-                onPointerUp={() => setArmed(null)}
-                className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-[#5a5a5a] outline-none hover:text-muted focus-visible:ring-1 focus-visible:ring-accent active:cursor-grabbing"
-              >
-                <GripVertical size={14} aria-hidden />
-              </button>
-              <span className="w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#5a5a5a]">{i + 1}</span>
               {def ? (
                 <OpSelect
                   label={`Row ${i + 1} action`}
@@ -447,44 +561,94 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
                   Unknown: {row.op}
                 </span>
               )}
-              <div className="flex shrink-0 items-center opacity-60 group-hover:opacity-100 group-focus-within:opacity-100">
+              {colorFields.length > 0 && (
+                <div className="flex shrink-0 items-center gap-2">
+                  {colorFields.map((f) => (
+                    <div key={f.key} className="flex items-center gap-1">
+                      {colorFields.length > 1 && (
+                        <span className="text-[11px] text-[#a0a0a0]">{f.key === "bg" ? "Bg" : f.label}</span>
+                      )}
+                      <ColorInput field={f} compact value={row.args[f.key] ?? f.default} onChange={(v) => setArg(f.key, v)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex shrink-0 items-center">
+                <div className="flex items-center opacity-60 group-hover:opacity-100 group-focus-within:opacity-100">
+                  <button
+                    type="button"
+                    className={iconBtnCls}
+                    aria-label={`Duplicate row ${i + 1}`}
+                    title="Duplicate"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      duplicate(i);
+                    }}
+                  >
+                    <Copy size={14} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${iconBtnCls} hover:text-red-400`}
+                    aria-label={`Delete row ${i + 1}`}
+                    title="Delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      remove(i);
+                    }}
+                  >
+                    <Trash2 size={14} aria-hidden />
+                  </button>
+                </div>
+                {/* Drag handle + row number. Only this arms the card's `draggable`, so inputs keep normal
+                    text selection and focus. */}
                 <button
                   type="button"
-                  className={iconBtnCls}
-                  aria-label={`Duplicate row ${i + 1}`}
-                  title="Duplicate"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    duplicate(i);
-                  }}
+                  data-handle
+                  aria-label={`Row ${i + 1}: drag to reorder, or Alt+Up/Down`}
+                  title="Drag to reorder (Alt+↑/↓)"
+                  onPointerDown={() => setArmed(row.id)}
+                  onPointerUp={() => setArmed(null)}
+                  className="ml-0.5 flex h-7 min-w-9 shrink-0 cursor-grab items-center justify-center gap-0.5 rounded-md border border-transparent pl-1 pr-1.5 text-[#5a5a5a] outline-none hover:border-border hover:bg-[#2a2a2a] hover:text-muted focus-visible:ring-1 focus-visible:ring-accent active:cursor-grabbing"
                 >
-                  <Copy size={14} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={`${iconBtnCls} hover:text-red-400`}
-                  aria-label={`Delete row ${i + 1}`}
-                  title="Delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    remove(i);
-                  }}
-                >
-                  <Trash2 size={14} aria-hidden />
+                  <GripVertical size={14} aria-hidden />
+                  <span className="font-mono text-[11px] tabular-nums">{i + 1}</span>
                 </button>
               </div>
             </div>
 
-            {def && def.fields.length > 0 && (
-              // pl-14 = handle (20) + gap (8) + number (20) + gap (8), so the fields line up under the select.
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 pl-14">
-                {def.fields.map((f) => (
+            {lines.length > 0 && (
+              <div className="mt-2 grid grid-cols-[64px_84px_84px_minmax(84px,1fr)] items-center gap-x-2 gap-y-1.5">
+                {lines.map((line) => (
+                  <Fragment key={line.label}>
+                    <span className="truncate text-[11px] text-[#a0a0a0]">{line.label}</span>
+                    {line.fields.map((f, c) => (
+                      <GridField
+                        key={f.key}
+                        field={f}
+                        col={c + 1}
+                        span={line.span}
+                        value={row.args[f.key] ?? f.default}
+                        variables={variables}
+                        onChange={(v) => setArg(f.key, v)}
+                      />
+                    ))}
+                    {/* Pad short lines so the next label starts a new grid row. */}
+                    {!line.span &&
+                      Array.from({ length: 3 - line.fields.length }, (_, k) => <span key={`pad${k}`} aria-hidden />)}
+                  </Fragment>
+                ))}
+              </div>
+            )}
+            {rest.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                {rest.map((f) => (
                   <FieldInput
                     key={f.key}
                     field={f}
                     value={row.args[f.key] ?? f.default}
                     variables={variables}
-                    onChange={(v) => update(row.id, (r) => ({ ...r, args: { ...r.args, [f.key]: v } }))}
+                    onChange={(v) => setArg(f.key, v)}
                   />
                 ))}
               </div>

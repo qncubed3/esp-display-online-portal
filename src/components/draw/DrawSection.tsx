@@ -44,36 +44,30 @@ export default function DrawSection(props: {
       <section className="min-w-0 flex-1" aria-label="Draw commands">
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h2 className="text-[14px] font-medium">Draw</h2>
+          <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
+            {(
+              [
+                ["rows", "Rows", List],
+                ["json", "JSON", Braces],
+              ] as const
+            ).map(([m, label, Icon]) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => setMode(m)}
+                className={`inline-flex items-center gap-1.5 rounded px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
+                  mode === m ? "bg-panel-hover text-fg" : "text-muted hover:text-fg"
+                }`}
+              >
+                <Icon size={13} aria-hidden /> {label}
+              </button>
+            ))}
+          </div>
           <span className="text-muted">
             {rows.length} {rows.length === 1 ? "command" : "commands"}
           </span>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            <AiHelperButton
-              buildSkill={() => buildDrawSkill(vars)}
-              title="AI helper: design the screen"
-              fileName="SKILL.md"
-              intro="Describe the screen you want, then paste the JSON it returns into the JSON editor."
-            />
-            <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
-              {(
-                [
-                  ["rows", "Rows", List],
-                  ["json", "JSON", Braces],
-                ] as const
-              ).map(([m, label, Icon]) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={mode === m}
-                  onClick={() => setMode(m)}
-                  className={`inline-flex items-center gap-1.5 rounded px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
-                    mode === m ? "bg-panel-hover text-fg" : "text-muted hover:text-fg"
-                  }`}
-                >
-                  <Icon size={13} aria-hidden /> {label}
-                </button>
-              ))}
-            </div>
             {mode === "rows" && (
               <>
                 <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="w-[200px]" />
@@ -82,6 +76,18 @@ export default function DrawSection(props: {
                 </button>
               </>
             )}
+            <AiHelperButton
+              buildSkill={() => buildDrawSkill(vars)}
+              title="AI helper: design the screen"
+              fileName="SKILL.md"
+              intro="Describe the screen you want, then paste the JSON it returns into the JSON editor."
+              pasteStep={
+                <>
+                  The AI replies with a <code className="font-mono text-fg">```json</code> code block. Copy it, switch Draw
+                  to <span className="text-fg">JSON</span> view, and paste it there (replacing what&apos;s in the editor).
+                </>
+              }
+            />
           </div>
         </div>
         {mode === "rows" ? (

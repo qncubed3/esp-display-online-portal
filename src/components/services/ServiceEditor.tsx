@@ -148,6 +148,13 @@ export default function ServiceEditor({
                     JavaScript to paste into Data and a JSON array to paste into Draw&apos;s JSON editor.
                   </>
                 }
+                pasteStep={
+                  <>
+                    The AI replies with two code blocks. Copy the <code className="font-mono text-fg">```js</code> block
+                    into the Data editor, and the <code className="font-mono text-fg">```json</code> block into Draw → JSON
+                    view (switch the Draw header to JSON first).
+                  </>
+                }
               />
               <Button size="sm" onClick={() => void refreshData()} disabled={refreshing} title="Run the Data code and refresh the preview">
                 {refreshing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}

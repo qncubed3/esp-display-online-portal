@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Check, Copy } from "lucide-react";
 import { LINE_HEIGHT, MIN_LINES, PAD_Y } from "@/components/data/editorMetrics";
 import type { DrawRow } from "@/lib/draw/ops";
 import { formatWire, parseWireText, rowsToWire } from "@/lib/draw/wire";
@@ -20,6 +20,22 @@ const toText = (rows: DrawRow[]) => formatWire(rowsToWire(rows));
 export default function DrawJsonEditor({ rows, onChange }: { rows: DrawRow[]; onChange(rows: DrawRow[]): void }) {
   const [text, setText] = useState(() => toText(rows));
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1200);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(textRef.current);
+      setCopied(true);
+    } catch {
+      // Clipboard blocked; the user can still select the text in the editor.
+    }
+  }
 
   const focused = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,7 +95,16 @@ export default function DrawJsonEditor({ rows, onChange }: { rows: DrawRow[]; on
   const lines = Math.max(MIN_LINES, text.split("\n").length);
 
   return (
-    <div>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => void copy()}
+        aria-label={copied ? "Copied JSON" : "Copy JSON"}
+        title={copied ? "Copied" : "Copy JSON"}
+        className="absolute right-1.5 top-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-panel/90 text-muted outline-none transition-colors hover:border-border-strong hover:text-fg focus-visible:ring-1 focus-visible:ring-accent"
+      >
+        {copied ? <Check size={14} className="text-accent" aria-hidden /> : <Copy size={14} aria-hidden />}
+      </button>
       <div
         className={`overflow-hidden rounded-md border bg-[#121212] focus-within:ring-2 ${
           error ? "border-danger/60 focus-within:ring-danger/30" : "border-border focus-within:border-border-strong focus-within:ring-accent/30"

@@ -5,18 +5,61 @@ import { Check, Copy, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 
+// Step-by-step guide for someone using ChatGPT or Claude in a web browser (no Claude Code, no skills).
+// `pasteStep` is the dialog-specific "where to paste the reply" step.
+function HowToUse({ pasteStep, fileName }: { pasteStep: ReactNode; fileName: string }) {
+  const code = (t: string) => <code className="font-mono text-fg">{t}</code>;
+  return (
+    <div className="mb-3 rounded-md border border-border bg-bg px-3 py-2.5 text-[12px] leading-5 text-muted">
+      <div className="mb-1 font-medium text-fg">How to use this with ChatGPT or Claude in your browser</div>
+      <ol className="list-decimal space-y-0.5 pl-5 marker:text-muted">
+        <li>
+          Click <span className="text-fg">Copy prompt</span> below.
+        </li>
+        <li>
+          Open{" "}
+          <a href="https://chatgpt.com" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            chatgpt.com
+          </a>{" "}
+          or{" "}
+          <a href="https://claude.ai" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            claude.ai
+          </a>{" "}
+          and start a new chat.
+        </li>
+        <li>
+          Paste the prompt as your first message. Then, in the same or the next message, describe what you want and give
+          your API URLs. If you can, also paste a sample API response (open the URL in your browser and copy the text).
+        </li>
+        <li>{pasteStep}</li>
+        <li>
+          Click {code("Run")} / check the preview. If something&apos;s off, paste the error or describe the problem back
+          to the AI.
+        </li>
+      </ol>
+      <p className="mt-1.5">
+        Advanced: on claude.ai you can upload the downloaded {code(fileName)} as a skill (Settings → Capabilities →
+        Skills) or add it to a Project&apos;s knowledge, so you don&apos;t have to paste it every time.
+      </p>
+    </div>
+  );
+}
+
 // "AI helper" button + dialog that shows a ready-made skill/prompt to copy into Claude (or any AI).
 // `buildSkill` is called when the dialog opens, so it can include live state (e.g. current variables).
 export default function AiHelperButton({
   buildSkill,
   title = "AI helper",
   intro,
+  pasteStep,
   label = "AI helper",
   fileName = "SKILL.md",
 }: {
   buildSkill(): string;
   title?: string;
   intro: ReactNode;
+  /** Step 4 of the "how to use" guide: where to paste the AI's reply. Omit to hide the guide. */
+  pasteStep?: ReactNode;
   label?: string;
   fileName?: string;
 }) {
@@ -84,6 +127,7 @@ export default function AiHelperButton({
         }
       >
         <div className="mb-3 text-[13px] text-muted">{intro}</div>
+        {pasteStep && <HowToUse pasteStep={pasteStep} fileName={fileName} />}
         <pre
           tabIndex={0}
           aria-label="Prompt"
