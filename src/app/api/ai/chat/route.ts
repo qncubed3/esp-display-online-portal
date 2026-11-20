@@ -5,7 +5,7 @@
 // Signed-in owners and members only (the service is read with the user's client, so RLS applies).
 
 import { buildChatSystemPrompt, parseReply, validateDraw } from "@/lib/ai/chat";
-import { getLlmProvider, ProviderError, type ChatMessage } from "@/lib/ai/providers";
+import { getLlmProvider, isBusyError, ProviderError, type ChatMessage } from "@/lib/ai/providers";
 import type { DrawRow } from "@/lib/draw/ops";
 import { createClient } from "@/lib/supabase/server";
 
@@ -124,6 +124,12 @@ export async function POST(request: Request) {
   } catch (e) {
     if (e instanceof ProviderError && e.timedOut) {
       return Response.json({ error: "The AI took too long to reply. Try again, or ask for a smaller change." }, { status: 504 });
+    }
+    if (isBusyError(e)) {
+      return Response.json(
+        { error: "The AI model is busy right now (the provider is overloaded). Try again in a minute." },
+        { status: 503 },
+      );
     }
     const status = e instanceof ProviderError && e.status === 429 ? 429 : 502;
     const message = e instanceof Error ? e.message : "The AI request failed.";
