@@ -19,7 +19,7 @@ export default function SharedServiceCard({ service: s }: { service: SharedServi
   return (
     <div className="relative h-full rounded-md border border-border bg-panel p-4 transition-colors hover:border-border-strong hover:bg-panel-hover">
       <div className="mb-6 flex items-start justify-between gap-3">
-        <h3 className="truncate text-sm font-medium">
+        <h3 className="min-w-0 truncate text-sm font-medium">
           <Link href={`/services/${s.id}`} className="after:absolute after:inset-0 after:rounded-md">
             {s.name}
           </Link>
@@ -29,7 +29,7 @@ export default function SharedServiceCard({ service: s }: { service: SharedServi
           <Badge variant={s.enabled ? "success" : "neutral"}>{s.enabled ? "Enabled" : "Disabled"}</Badge>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 text-[12px] text-muted">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[12px] text-muted">
         <span className="inline-flex items-center gap-1.5">
           <Cpu size={13} />
           {s.deviceCount} {s.deviceCount === 1 ? "device" : "devices"}

@@ -21,9 +21,9 @@ type ServiceCard = {
 export default function DashboardPage() {
   return (
     <AppShell crumbs={[{ label: "My Services" }]}>
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
+      <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1 className="text-xl font-medium">My Services</h1>
             <Suspense fallback={null}>
               <SharedLink />
@@ -72,7 +72,7 @@ async function ServiceGrid() {
 
   if (services.length === 0) {
     return (
-      <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-6 py-16 text-center">
+      <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-4 py-16 sm:px-6 text-center">
         <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted">
           <Monitor size={18} />
         </span>
@@ -99,10 +99,10 @@ async function ServiceGrid() {
               className="block h-full rounded-md border border-border bg-panel p-4 transition-colors hover:border-border-strong hover:bg-panel-hover"
             >
               <div className="mb-6 flex items-start justify-between gap-3">
-                <h3 className="truncate text-sm font-medium">{s.name}</h3>
+                <h3 className="min-w-0 truncate text-sm font-medium">{s.name}</h3>
                 <Badge variant={s.enabled ? "success" : "neutral"}>{s.enabled ? "Enabled" : "Disabled"}</Badge>
               </div>
-              <div className="flex items-center justify-between text-[12px] text-muted">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[12px] text-muted">
                 <span className="inline-flex items-center gap-1.5">
                   <Cpu size={13} />
                   {deviceCount} {deviceCount === 1 ? "device" : "devices"}

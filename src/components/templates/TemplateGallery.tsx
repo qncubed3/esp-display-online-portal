@@ -30,9 +30,9 @@ const PREVIEW_PLACEHOLDER = (
 
 function TemplateCard({ t }: { t: Template }) {
   return (
-    <li className="flex flex-col rounded-md border border-border bg-panel">
+    <li className="flex min-w-0 flex-col rounded-md border border-border bg-panel">
       <div className="flex justify-center border-b border-border bg-bg px-4 py-5">
-        <LazyMount placeholder={PREVIEW_PLACEHOLDER} className="max-w-full">
+        <LazyMount placeholder={PREVIEW_PLACEHOLDER} className="min-w-0 max-w-full">
           <Preview t={t} />
         </LazyMount>
       </div>
@@ -44,7 +44,7 @@ function TemplateCard({ t }: { t: Template }) {
             <Badge key={api}>{api}</Badge>
           ))}
         </div>
-        <div className="mt-4 flex flex-1 items-end justify-end gap-2">
+        <div className="mt-4 flex flex-1 flex-wrap items-end justify-end gap-2">
           <LoadIntoServiceButton templateId={t.id} templateName={t.name} />
           <UseTemplateButton templateId={t.id} templateName={t.name} />
         </div>

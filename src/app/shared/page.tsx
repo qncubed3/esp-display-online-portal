@@ -18,7 +18,7 @@ type Row = {
 export default function SharedPage() {
   return (
     <AppShell crumbs={[{ label: "Shared with me" }]}>
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
         <h1 className="mb-6 text-xl font-medium">Shared with me</h1>
         <Suspense fallback={<CardGridSkeleton />}>
           <SharedList />
@@ -69,7 +69,7 @@ async function SharedList() {
         )}
 
         {services.length === 0 && !error ? (
-          <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-6 py-16 text-center">
+          <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-4 py-16 text-center sm:px-6">
             <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted">
               <Users size={18} />
             </span>
