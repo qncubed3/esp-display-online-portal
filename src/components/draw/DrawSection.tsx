@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Braces, List, LoaderCircle, Plus, RefreshCw } from "lucide-react";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
@@ -21,8 +21,10 @@ export default function DrawSection(props: {
   varsError?: string;
   refreshing: boolean;
   onRefreshData(): void;
+  /** Rendered under the preview (the AI assistant). */
+  belowPreview?: ReactNode;
 }) {
-  const { rows, onChange, vars, varsError, refreshing, onRefreshData } = props;
+  const { rows, onChange, vars, varsError, refreshing, onRefreshData, belowPreview } = props;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOp, setAddOp] = useState("text");
   const [mode, setMode] = useState<"rows" | "json">("rows");
@@ -122,6 +124,8 @@ export default function DrawSection(props: {
             {refreshing ? "Running…" : "Refresh data"}
           </button>
         </div>
+
+        {belowPreview}
       </aside>
     </div>
   );

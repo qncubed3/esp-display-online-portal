@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { AlertCircle, Check, Code2, Cpu, LayoutTemplate, Loader2, Play, Rocket, Shapes } from "lucide-react";
 import { saveService } from "@/app/services/[id]/actions";
+import AiChat from "@/components/ai/AiChat";
 import AiHelperButton from "@/components/ai/AiHelperButton";
+import { useAiChat } from "@/components/ai/useAiChat";
 import DataEditor from "@/components/data/DataEditor";
 import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
@@ -105,6 +107,31 @@ export default function ServiceEditor({
   useEffect(() => {
     void refreshData();
   }, [refreshData]);
+
+  // ---------- AI assistant (applies its changes to the editor; nothing is saved until deploy)
+
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const varsRef = useRef(vars);
+  varsRef.current = vars;
+  const aiChat = useAiChat({
+    serviceId,
+    getState: useCallback(() => ({ code: codeRef.current, rows: rowsRef.current, vars: varsRef.current }), []),
+    apply: useCallback(
+      (change: { code?: string; rows?: DrawRow[] }) => {
+        if (change.rows) {
+          setRows(change.rows);
+          rowsRef.current = change.rows;
+        }
+        if (change.code !== undefined) {
+          setCode(change.code);
+          codeRef.current = change.code; // so refreshData runs the new code before the re-render
+          void refreshData();
+        }
+      },
+      [refreshData],
+    ),
+  });
 
   // ---------- load a template (replaces Data and/or Draw locally; nothing is saved until deploy)
 
@@ -269,6 +296,7 @@ export default function ServiceEditor({
           varsError={varsError}
           refreshing={refreshing}
           onRefreshData={() => void refreshData()}
+          belowPreview={<AiChat chat={aiChat} />}
         />
       )}
 
