@@ -1,10 +1,7 @@
 import { notFound } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
-import DataEditor from "@/components/data/DataEditor";
-import DevicesPanel from "@/components/devices/DevicesPanel";
-import DrawTab from "@/components/draw/DrawTab";
+import ServiceEditor from "@/components/services/ServiceEditor";
 import ServiceHeader from "@/components/services/ServiceHeader";
-import ServiceTabs from "@/components/services/ServiceTabs";
 import { requireUser } from "@/lib/auth";
 import type { DrawRow } from "@/lib/draw/ops";
 
@@ -32,10 +29,10 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
     <AppShell email={user.email ?? ""} crumbs={[{ label: "Services", href: "/" }, { label: service.name }]}>
       <div className="mx-auto max-w-6xl px-6 py-6">
         <ServiceHeader serviceId={service.id} name={service.name} enabled={service.enabled} />
-        <ServiceTabs
-          data={<DataEditor serviceId={service.id} initialCode={service.data_code} />}
-          draw={<DrawTab serviceId={service.id} initialRows={Array.isArray(service.draw_ops) ? service.draw_ops : []} />}
-          devices={<DevicesPanel serviceId={service.id} />}
+        <ServiceEditor
+          serviceId={service.id}
+          initialCode={service.data_code ?? ""}
+          initialRows={Array.isArray(service.draw_ops) ? service.draw_ops : []}
         />
       </div>
     </AppShell>

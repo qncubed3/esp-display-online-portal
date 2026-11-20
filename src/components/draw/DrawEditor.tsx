@@ -6,15 +6,18 @@ import {
   useState,
   type DragEvent,
   type KeyboardEvent,
+  type ReactNode,
+  type SelectHTMLAttributes,
 } from "react";
+import { ChevronDown, Copy, GripVertical, Trash2 } from "lucide-react";
 import { OPS, OP_BY_NAME, SWATCHES, newRow, type DrawRow, type Field } from "@/lib/draw/ops";
 
 export interface DrawEditorProps {
   rows: DrawRow[];
   onChange(rows: DrawRow[]): void;
   variables: string[];
-  selectedId?: string | null;
-  onSelect?(id: string | null): void;
+  selectedId: string | null;
+  onSelect(id: string | null): void;
 }
 
 const GROUPS = ["Screen", "Shapes", "Text"] as const;
@@ -24,9 +27,22 @@ const inputCls =
 const iconBtnCls =
   "inline-flex h-7 w-7 items-center justify-center rounded-md text-[#a0a0a0] outline-none hover:bg-[#2a2a2a] hover:text-[#ededed] focus-visible:ring-1 focus-visible:ring-[#3ecf8e]";
 
-function OpSelect({ value, onChange, className = "", label }: { value: string; onChange(op: string): void; className?: string; label: string }) {
+// Native select with a custom chevron. h-7 (28px) and a 14px icon leave 7px above and below it,
+// so the icon sits 7px from the right edge too; pr-7 keeps the text clear of it.
+export function Select({ className = "", children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode }) {
   return (
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} pr-6 ${className}`}>
+    <div className={`relative ${className}`}>
+      <select {...rest} className={`${inputCls} w-full cursor-pointer appearance-none pr-7`}>
+        {children}
+      </select>
+      <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-[7px] top-1/2 -translate-y-1/2 text-muted" />
+    </div>
+  );
+}
+
+export function OpSelect({ value, onChange, className = "", label }: { value: string; onChange(op: string): void; className?: string; label: string }) {
+  return (
+    <Select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={className}>
       {GROUPS.map((g) => (
         <optgroup key={g} label={g}>
           {OPS.filter((d) => d.group === g).map((d) => (
@@ -36,7 +52,7 @@ function OpSelect({ value, onChange, className = "", label }: { value: string; o
           ))}
         </optgroup>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -227,7 +243,7 @@ function SelectInput({ field, value, onChange }: { field: Field; value: string |
   const str = String(value ?? "");
   const known = opts.some((o) => String(o.value) === str);
   return (
-    <select
+    <Select
       aria-label={field.label}
       title={field.label}
       value={str}
@@ -235,7 +251,6 @@ function SelectInput({ field, value, onChange }: { field: Field; value: string |
         const o = opts.find((o) => String(o.value) === e.target.value);
         onChange(o ? o.value : e.target.value);
       }}
-      className={`${inputCls} pr-6`}
     >
       {!known && <option value={str}>{str || "—"}</option>}
       {opts.map((o) => (
@@ -243,7 +258,7 @@ function SelectInput({ field, value, onChange }: { field: Field; value: string |
           {o.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -276,15 +291,7 @@ function changeOp(row: DrawRow, op: string): DrawRow {
   return { ...row, op, args };
 }
 
-export default function DrawEditor({ rows, onChange, variables, selectedId, onSelect }: DrawEditorProps) {
-  const [localSel, setLocalSel] = useState<string | null>(null);
-  const sel = selectedId !== undefined ? selectedId : localSel;
-  const select = (id: string | null) => {
-    setLocalSel(id);
-    onSelect?.(id);
-  };
-
-  const [addOp, setAddOp] = useState("drawString");
+export default function DrawEditor({ rows, onChange, variables, selectedId: sel, onSelect: select }: DrawEditorProps) {
   const [armed, setArmed] = useState<string | null>(null); // row whose handle is pressed
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null); // insert-before index
@@ -319,22 +326,14 @@ export default function DrawEditor({ rows, onChange, variables, selectedId, onSe
     if (neighbour) focusRow(neighbour.id);
   };
 
-  const add = () => {
-    const r = newRow(addOp);
-    onChange([...rows, r]);
-    select(r.id);
-  };
-
   const onRowKey = (e: KeyboardEvent<HTMLLIElement>, i: number) => {
-    if (!e.altKey) return;
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault();
-      const to = i + (e.key === "ArrowUp" ? -1 : 1);
-      if (to < 0 || to >= rows.length) return;
-      const id = rows[i].id;
-      move(i, to);
-      focusRow(id);
-    }
+    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const to = i + (e.key === "ArrowUp" ? -1 : 1);
+    if (to < 0 || to >= rows.length) return;
+    const id = rows[i].id;
+    move(i, to);
+    focusRow(id);
   };
 
   const onDragOver = (e: DragEvent<HTMLLIElement>, i: number) => {
@@ -345,85 +344,141 @@ export default function DrawEditor({ rows, onChange, variables, selectedId, onSe
     setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
   };
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    if (dragId != null && dropAt != null) {
-      const from = rows.findIndex((r) => r.id === dragId);
-      if (from >= 0) move(from, dropAt > from ? dropAt - 1 : dropAt);
-    }
-    endDrag();
-  };
-
   const endDrag = () => {
     setDragId(null);
     setDropAt(null);
     setArmed(null);
   };
 
+  // Handled on the list so a drop in the gap between cards still lands.
+  const onDrop = (e: DragEvent) => {
+    if (!dragId) return;
+    e.preventDefault();
+    if (dropAt != null) {
+      const from = rows.findIndex((r) => r.id === dragId);
+      if (from >= 0) move(from, dropAt > from ? dropAt - 1 : dropAt);
+    }
+    endDrag();
+  };
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted">
+        No draw commands yet. Pick a type above and click Add row. Rows run top to bottom, like the device draws them.
+      </div>
+    );
+  }
+
+  // Drop indicator: a glowing line in the middle of the 8px gap between cards.
+  const indicator = (pos: "top" | "bottom") => (
+    <div
+      className={`pointer-events-none absolute -left-px -right-px h-[2px] rounded-full bg-accent shadow-[0_0_6px_#3ecf8e] ${
+        pos === "top" ? "-top-[5px]" : "-bottom-[5px]"
+      }`}
+    />
+  );
+
   return (
-    <div className="text-[13px] text-[#ededed]">
-      {rows.length === 0 ? (
-        <div className="rounded-md border border-dashed border-[#2e2e2e] px-4 py-8 text-center text-[#a0a0a0]">
-          No draw commands yet. Add one below. Rows run top to bottom, like the device draws them.
-        </div>
-      ) : (
-        <ol ref={listRef} className="flex flex-col" onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropAt(null);
-        }}>
-          {rows.map((row, i) => {
-            const def = OP_BY_NAME[row.op];
-            const selected = sel === row.id;
-            return (
-              <li
-                key={row.id}
-                data-row-id={row.id}
-                draggable={armed === row.id}
-                onDragStart={(e) => {
-                  setDragId(row.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", row.id);
-                }}
-                onDragOver={(e) => onDragOver(e, i)}
-                onDrop={onDrop}
-                onDragEnd={endDrag}
-                onKeyDown={(e) => onRowKey(e, i)}
-                onClick={() => select(row.id)}
-                onFocus={() => {
-                  if (!selected) select(row.id);
-                }}
-                className={`group relative -mt-px flex flex-wrap items-center gap-x-2 gap-y-1.5 border px-2 py-1.5 first:mt-0 first:rounded-t-md last:rounded-b-md ${
-                  selected ? "z-10 border-[#3ecf8e]/60 bg-[#232323]" : "border-[#2e2e2e] bg-[#1c1c1c] hover:bg-[#202020]"
-                } ${dragId === row.id ? "opacity-40" : ""}`}
+    <ol
+      ref={listRef}
+      className="flex flex-col gap-2 text-[13px] text-fg"
+      onDragOver={(e) => {
+        if (dragId) e.preventDefault();
+      }}
+      onDrop={onDrop}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropAt(null);
+      }}
+    >
+      {rows.map((row, i) => {
+        const def = OP_BY_NAME[row.op];
+        const selected = sel === row.id;
+        const dragging = dragId === row.id;
+        return (
+          <li
+            key={row.id}
+            data-row-id={row.id}
+            draggable={armed === row.id}
+            onDragStart={(e) => {
+              setDragId(row.id);
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", row.id);
+            }}
+            onDragOver={(e) => onDragOver(e, i)}
+            onDragEnd={endDrag}
+            onKeyDown={(e) => onRowKey(e, i)}
+            onClick={() => select(row.id)}
+            onFocus={() => {
+              if (!selected) select(row.id);
+            }}
+            className={`group relative rounded-md border p-2 transition-[background-color,border-color,opacity] ${
+              dragging
+                ? "border-dashed border-accent/60 bg-bg opacity-40"
+                : selected
+                  ? "border-accent/60 bg-panel-hover"
+                  : "border-border bg-bg hover:border-border-strong"
+            }`}
+          >
+            {dropAt === i && indicator("top")}
+            {dropAt === rows.length && i === rows.length - 1 && indicator("bottom")}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-handle
+                aria-label={`Row ${i + 1}: drag to reorder, or Alt+Up/Down`}
+                title="Drag to reorder (Alt+↑/↓)"
+                onPointerDown={() => setArmed(row.id)}
+                onPointerUp={() => setArmed(null)}
+                className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-[#5a5a5a] outline-none hover:text-muted focus-visible:ring-1 focus-visible:ring-accent active:cursor-grabbing"
               >
-                {dropAt === i && <div className="pointer-events-none absolute -top-[2px] left-0 right-0 h-[3px] rounded bg-[#3ecf8e]" />}
-                {dropAt === rows.length && i === rows.length - 1 && (
-                  <div className="pointer-events-none absolute -bottom-[2px] left-0 right-0 h-[3px] rounded bg-[#3ecf8e]" />
-                )}
+                <GripVertical size={14} aria-hidden />
+              </button>
+              <span className="w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#5a5a5a]">{i + 1}</span>
+              {def ? (
+                <OpSelect
+                  label={`Row ${i + 1} action`}
+                  value={row.op}
+                  onChange={(op) => update(row.id, (r) => changeOp(r, op))}
+                  className="min-w-0 flex-1"
+                />
+              ) : (
+                <span className="flex h-7 min-w-0 flex-1 items-center truncate rounded-md border border-red-900/60 bg-red-950/30 px-2 text-[12px] text-red-300">
+                  Unknown: {row.op}
+                </span>
+              )}
+              <div className="flex shrink-0 items-center opacity-60 group-hover:opacity-100 group-focus-within:opacity-100">
                 <button
                   type="button"
-                  data-handle
-                  aria-label={`Row ${i + 1}: drag to reorder, or Alt+Up/Down`}
-                  title="Drag to reorder (Alt+↑/↓)"
-                  onPointerDown={() => setArmed(row.id)}
-                  onPointerUp={() => setArmed(null)}
-                  className="flex h-7 w-5 cursor-grab items-center justify-center rounded text-[#5a5a5a] outline-none hover:text-[#a0a0a0] focus-visible:ring-1 focus-visible:ring-[#3ecf8e] active:cursor-grabbing"
+                  className={iconBtnCls}
+                  aria-label={`Duplicate row ${i + 1}`}
+                  title="Duplicate"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    duplicate(i);
+                  }}
                 >
-                  <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor" aria-hidden>
-                    {[0, 5, 10].map((y) => (
-                      <g key={y}>
-                        <circle cx="2" cy={y + 2} r="1.2" />
-                        <circle cx="6" cy={y + 2} r="1.2" />
-                      </g>
-                    ))}
-                  </svg>
+                  <Copy size={14} aria-hidden />
                 </button>
-                <span className="w-5 text-right font-mono text-[11px] tabular-nums text-[#5a5a5a]">{i + 1}</span>
-                {def ? (
-                  <OpSelect label={`Row ${i + 1} action`} value={row.op} onChange={(op) => update(row.id, (r) => changeOp(r, op))} className="w-[170px]" />
-                ) : (
-                  <span className="rounded-md border border-red-900/60 bg-red-950/30 px-2 py-1 text-[12px] text-red-300">Unknown: {row.op}</span>
-                )}
-                {def?.fields.map((f) => (
+                <button
+                  type="button"
+                  className={`${iconBtnCls} hover:text-red-400`}
+                  aria-label={`Delete row ${i + 1}`}
+                  title="Delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    remove(i);
+                  }}
+                >
+                  <Trash2 size={14} aria-hidden />
+                </button>
+              </div>
+            </div>
+
+            {def && def.fields.length > 0 && (
+              // pl-14 = handle (20) + gap (8) + number (20) + gap (8), so the fields line up under the select.
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 pl-14">
+                {def.fields.map((f) => (
                   <FieldInput
                     key={f.key}
                     field={f}
@@ -432,35 +487,11 @@ export default function DrawEditor({ rows, onChange, variables, selectedId, onSe
                     onChange={(v) => update(row.id, (r) => ({ ...r, args: { ...r.args, [f.key]: v } }))}
                   />
                 ))}
-                <div className="ml-auto flex items-center opacity-60 group-hover:opacity-100 group-focus-within:opacity-100">
-                  <button type="button" className={iconBtnCls} aria-label={`Duplicate row ${i + 1}`} title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicate(i); }}>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                      <rect x="5" y="5" width="9" height="9" rx="1.5" />
-                      <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" />
-                    </svg>
-                  </button>
-                  <button type="button" className={`${iconBtnCls} hover:text-red-400`} aria-label={`Delete row ${i + 1}`} title="Delete" onClick={(e) => { e.stopPropagation(); remove(i); }}>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                      <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4" />
-                    </svg>
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-
-      <div className="mt-3 flex items-center gap-2">
-        <OpSelect label="New row action" value={addOp} onChange={setAddOp} className="w-[190px]" />
-        <button
-          type="button"
-          onClick={add}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-[#2e2e2e] bg-[#232323] px-3 text-[13px] text-[#ededed] outline-none hover:border-[#3e3e3e] hover:bg-[#2a2a2a] focus-visible:border-[#3ecf8e]"
-        >
-          <span className="text-[#3ecf8e]">+</span> Add row
-        </button>
-      </div>
-    </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }

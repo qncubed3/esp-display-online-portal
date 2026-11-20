@@ -1,5 +1,6 @@
-// Runs a Service's saved Data section for the Draw editor's preview.
-//   POST { serviceId } -> { vars, error? }
+// Runs a Service's Data section for the Draw editor's preview.
+//   POST { serviceId, code? } -> { vars, error? }
+// When `code` is a string (the editor's unsaved code) it runs instead of the saved data_code.
 // Signed-in owners only: the service is read with the user's client, so RLS applies.
 
 import { createClient } from "@/lib/supabase/server";
@@ -9,8 +10,9 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   let serviceId: unknown;
+  let code: unknown;
   try {
-    ({ serviceId } = await request.json());
+    ({ serviceId, code } = await request.json());
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -32,6 +34,7 @@ export async function POST(request: Request) {
   if (error && error.code !== "22P02") return Response.json({ error: error.message }, { status: 500 });
   if (!service) return Response.json({ error: "Service not found" }, { status: 404 });
 
-  const result = await runDataCode((service as { data_code: string | null }).data_code ?? "");
+  const source = typeof code === "string" ? code : ((service as { data_code: string | null }).data_code ?? "");
+  const result = await runDataCode(source);
   return Response.json(result, { headers: { "Cache-Control": "no-store" } });
 }

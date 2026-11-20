@@ -21,14 +21,10 @@ async function update(serviceId: string, fields: Record<string, unknown>) {
   revalidatePath(`/services/${serviceId}`);
 }
 
-export async function saveDrawOps(serviceId: string, rows: DrawRow[]): Promise<void> {
-  if (!Array.isArray(rows)) throw new Error("Invalid draw rows.");
-  await update(serviceId, { draw_ops: rows });
-}
-
-export async function saveDataCode(serviceId: string, code: string): Promise<void> {
-  if (typeof code !== "string") throw new Error("Invalid code.");
-  await update(serviceId, { data_code: code });
+export async function saveService(serviceId: string, changes: { data_code: string; draw_ops: DrawRow[] }): Promise<void> {
+  if (typeof changes?.data_code !== "string") throw new Error("Invalid code.");
+  if (!Array.isArray(changes.draw_ops)) throw new Error("Invalid draw rows.");
+  await update(serviceId, { data_code: changes.data_code, draw_ops: changes.draw_ops });
 }
 
 export async function updateService(serviceId: string, changes: { name?: string; enabled?: boolean }): Promise<void> {
