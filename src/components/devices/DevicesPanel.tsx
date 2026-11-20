@@ -9,6 +9,7 @@ import {
   regenerateDeviceKey,
   type DeviceRow,
 } from "@/lib/devices/actions";
+import { updateService } from "@/app/services/[id]/actions";
 import SetupFilesDialog from "./SetupFilesDialog";
 
 const ONLINE_MS = 2 * 60 * 1000;
@@ -105,7 +106,60 @@ function NewKeyCallout({
   );
 }
 
-export default function DevicesPanel({ serviceId }: { serviceId: string }) {
+// Seconds between device polls. Each poll is one Vercel function call (Hobby: ~1M/month).
+const POLL_OPTIONS: { value: number; label: string }[] = [
+  { value: 15, label: "Every 15 s" },
+  { value: 30, label: "Every 30 s" },
+  { value: 60, label: "Every minute" },
+  { value: 120, label: "Every 2 min" },
+  { value: 300, label: "Every 5 min" },
+  { value: 600, label: "Every 10 min" },
+  { value: 1800, label: "Every 30 min" },
+  { value: 3600, label: "Every hour" },
+];
+
+// Saves as soon as it changes; devices pick the new value up on their next poll.
+function PollFrequency({ serviceId, initial }: { serviceId: string; initial: number }) {
+  const [value, setValue] = useState(initial);
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const options = POLL_OPTIONS.some((o) => o.value === value) ? POLL_OPTIONS : [...POLL_OPTIONS, { value, label: `Every ${value} s` }];
+
+  async function change(next: number) {
+    const prev = value;
+    setValue(next);
+    setState("saving");
+    try {
+      await updateService(serviceId, { pollSeconds: next });
+      setState("saved");
+    } catch {
+      setValue(prev);
+      setState("error");
+    }
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-[#a0a0a0]" title="How often devices ask for a new screen. Each poll counts towards Vercel's free-tier limit.">
+      <span>Poll</span>
+      <select
+        value={value}
+        onChange={(e) => void change(Number(e.target.value))}
+        disabled={state === "saving"}
+        className="h-7 cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none focus:border-[#3e3e3e]"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {state === "saving" && <Loader2 size={14} className="animate-spin" aria-label="Saving" />}
+      {state === "saved" && <Check size={14} className="text-[#3ecf8e]" aria-label="Saved" />}
+      {state === "error" && <span className="text-[12px] text-[#ff8a8e]">Couldn&apos;t save</span>}
+    </label>
+  );
+}
+
+export default function DevicesPanel({ serviceId, pollSeconds = 30 }: { serviceId: string; pollSeconds?: number }) {
   const [devices, setDevices] = useState<DeviceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // device id, or "add"
@@ -180,6 +234,8 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
           <h2 className="text-[14px] font-medium">Devices</h2>
           <p className="text-[#a0a0a0]">ESP32 screens that show this service.</p>
         </div>
+        <div className="flex items-center gap-3">
+        <PollFrequency serviceId={serviceId} initial={pollSeconds} />
         {!adding && (
           <button
             type="button"
@@ -189,6 +245,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
             <Plus size={14} /> Add device
           </button>
         )}
+        </div>
       </div>
 
       {adding && (

@@ -27,7 +27,7 @@ export async function saveService(serviceId: string, changes: { data_code: strin
   await update(serviceId, { data_code: changes.data_code, draw_ops: changes.draw_ops });
 }
 
-export async function updateService(serviceId: string, changes: { name?: string; enabled?: boolean }): Promise<void> {
+export async function updateService(serviceId: string, changes: { name?: string; enabled?: boolean; pollSeconds?: number }): Promise<void> {
   const fields: Record<string, unknown> = {};
   if (changes.name !== undefined) {
     const name = changes.name.trim();
@@ -35,6 +35,11 @@ export async function updateService(serviceId: string, changes: { name?: string;
     fields.name = name;
   }
   if (changes.enabled !== undefined) fields.enabled = !!changes.enabled;
+  if (changes.pollSeconds !== undefined) {
+    const s = Math.round(changes.pollSeconds);
+    if (!(s >= 15 && s <= 3600)) throw new Error("Poll frequency must be between 15 seconds and 1 hour.");
+    fields.poll_seconds = s;
+  }
   if (!Object.keys(fields).length) return;
   await update(serviceId, fields);
 }

@@ -12,6 +12,7 @@ type Service = {
   enabled: boolean;
   data_code: string;
   draw_ops: DrawRow[];
+  poll_seconds?: number;
   updated_at: string;
 };
 
@@ -20,7 +21,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   const { supabase, user } = await requireUser();
   const { data } = await supabase
     .from("services")
-    .select("id, name, owner_id, enabled, data_code, draw_ops, updated_at")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
@@ -35,6 +36,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
           serviceId={service.id}
           initialCode={service.data_code ?? ""}
           initialRows={Array.isArray(service.draw_ops) ? service.draw_ops : []}
+          pollSeconds={service.poll_seconds ?? 30}
         />
       </div>
     </AppShell>
