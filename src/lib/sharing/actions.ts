@@ -106,7 +106,8 @@ export async function leaveService(serviceId: string): Promise<void> {
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error("You are not a member of this service.");
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/shared");
+  redirect("/shared");
 }
 
 // Services the caller has been added to, newest first.
