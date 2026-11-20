@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ChevronRight, LayoutGrid, LogOut, Monitor } from "lucide-react";
+import { ChevronRight, LogOut, Monitor } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
+import SidebarNav from "@/components/layout/SidebarNav";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
 export interface Crumb {
@@ -31,15 +32,7 @@ export default function AppShell({
           <span className="text-[13px] font-medium">ESP Display Portal</span>
         </Link>
 
-        <nav className="flex-1 p-2">
-          <Link
-            href="/"
-            className="flex h-8 items-center gap-2 rounded-md bg-panel-hover px-2 text-[13px] text-fg"
-          >
-            <LayoutGrid size={14} className="text-muted" />
-            Services
-          </Link>
-        </nav>
+        <SidebarNav />
 
         <div className="border-t border-border p-3">
           <p className="mb-2 truncate text-[12px] text-muted" title={email}>
