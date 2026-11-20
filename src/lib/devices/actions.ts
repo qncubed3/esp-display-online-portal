@@ -64,6 +64,22 @@ function writeError(error: { code?: string; message: string }): Error {
   return new Error(error.message);
 }
 
+// Tells a Service's owner that someone else's device joined or left it. Never throws.
+async function notifyServiceOwner(
+  serviceId: string | null | undefined,
+  actor: { id: string; email?: string },
+  device: string,
+  change: "subscribed" | "moved" | "deleted" | "transferred",
+): Promise<void> {
+  if (!serviceId) return;
+  const { data } = await createAdminClient().from("services").select("name, owner_id").eq("id", serviceId).maybeSingle();
+  const svc = data as { name: string; owner_id: string } | null;
+  if (!svc || svc.owner_id === actor.id) return;
+  const base = { service_id: serviceId, service_name: svc.name, device_name: device, owner_email: actor.email ?? "Someone" };
+  if (change === "subscribed") await notify(svc.owner_id, "device_subscribed", base);
+  else await notify(svc.owner_id, "device_unsubscribed", { ...base, reason: change });
+}
+
 function cleanName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Device name is required");
@@ -124,14 +140,16 @@ async function emailsFor(userIds: string[]): Promise<Map<string, string>> {
 // Creates a device owned by the signed-in user (owner_id defaults to auth.uid()) and returns its key.
 // The plain key is returned only here; just its hash is stored.
 export async function addDevice(name: string, serviceId: string | null): Promise<{ id: string; key: string }> {
-  const { supabase } = await signedIn();
+  const { supabase, user } = await signedIn();
   const key = generateDeviceKey();
+  const deviceName = cleanName(name);
   const { data, error } = await supabase
     .from("devices")
-    .insert({ name: cleanName(name), service_id: serviceId || null, key_hash: hashKey(key) })
+    .insert({ name: deviceName, service_id: serviceId || null, key_hash: hashKey(key) })
     .select("id")
     .single();
   if (error) throw writeError(error);
+  await notifyServiceOwner(serviceId, user, deviceName, "subscribed");
   revalidateDevicePages(serviceId);
   return { id: (data as { id: string }).id, key };
 }
@@ -139,10 +157,10 @@ export async function addDevice(name: string, serviceId: string | null): Promise
 // Subscribes a device to another Service, or to none. Same key and firmware; the device gets the
 // new Service's screen on its next poll. RLS only allows Services the owner can access.
 export async function setDeviceService(deviceId: string, serviceId: string | null): Promise<void> {
-  const { supabase } = await signedIn();
+  const { supabase, user } = await signedIn();
   const { data: before, error: readError } = await supabase
     .from("devices")
-    .select("service_id")
+    .select("service_id, name")
     .eq("id", deviceId)
     .maybeSingle();
   if (readError) throw new Error(readError.message);
@@ -154,7 +172,16 @@ export async function setDeviceService(deviceId: string, serviceId: string | nul
     .select("id");
   if (error) throw writeError(error);
   if (!data || data.length === 0) throw new Error("Only the device's owner can change its Service");
-  revalidateDevicePages((before as { service_id: string | null }).service_id, serviceId);
+  const prev = before as { service_id: string | null; name: string };
+  const next = serviceId || null;
+  if (prev.service_id !== next) {
+    // The owners of the Service it left and the one it joined, unless that's the device's owner.
+    await Promise.all([
+      notifyServiceOwner(prev.service_id, user, prev.name, "moved"),
+      notifyServiceOwner(next, user, prev.name, "subscribed"),
+    ]);
+  }
+  revalidateDevicePages(prev.service_id, serviceId);
 }
 
 // Runs an owner-only update and revalidates the pages showing the device.
@@ -185,11 +212,13 @@ export async function regenerateDeviceKey(deviceId: string): Promise<string> {
 }
 
 export async function deleteDevice(deviceId: string): Promise<void> {
-  const { supabase } = await signedIn();
-  const { data, error } = await supabase.from("devices").delete().eq("id", deviceId).select("service_id");
+  const { supabase, user } = await signedIn();
+  const { data, error } = await supabase.from("devices").delete().eq("id", deviceId).select("service_id, name");
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error("Device not found");
-  revalidateDevicePages((data[0] as { service_id: string | null }).service_id);
+  const deleted = data[0] as { service_id: string | null; name: string };
+  await notifyServiceOwner(deleted.service_id, user, deleted.name, "deleted");
+  revalidateDevicePages(deleted.service_id);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -233,6 +262,7 @@ export async function transferDevice(
     ]);
     keepService = (svc as { owner_id: string } | null)?.owner_id === targetId || !!member;
   }
+  const unsubscribed = !!d.service_id && !keepService;
 
   const { data: updated, error } = await admin
     .from("devices")
@@ -243,11 +273,15 @@ export async function transferDevice(
   if (error) return { error: error.message };
   if (!updated?.length) return { error: "Only the device's owner can transfer it." };
 
-  await notify(targetId as string, "device_transferred", {
-    device_id: d.id,
-    device_name: d.name,
-    from_email: user.email ?? "Someone",
-  });
+  await Promise.all([
+    notify(targetId as string, "device_transferred", {
+      device_id: d.id,
+      device_name: d.name,
+      from_email: user.email ?? "Someone",
+    }),
+    // The new owner can't access the device's Service, so it left it: tell that Service's owner.
+    unsubscribed ? notifyServiceOwner(d.service_id, user, d.name, "transferred") : undefined,
+  ]);
   revalidateDevicePages(d.service_id);
-  return { unsubscribed: !!d.service_id && !keepService, ownerEmail: normalized };
+  return { unsubscribed, ownerEmail: normalized };
 }

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import AppShell from "@/components/layout/AppShell";
 import CopyText from "@/components/settings/CopyText";
 import PasswordForm from "@/components/settings/PasswordForm";
+import PushNotifications from "@/components/settings/PushNotifications";
 import SettingsCard, { Field } from "@/components/settings/SettingsCard";
 import SignOutEverywhere from "@/components/settings/SignOutEverywhere";
 import TimezoneForm from "@/components/settings/TimezoneForm";
@@ -59,6 +60,8 @@ export default function SettingsPage() {
         >
           <TimezoneSection />
         </Suspense>
+
+        <PushNotifications />
 
         <SignOutEverywhere />
       </div>

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { describeNotification, type NotificationKind } from "@/lib/notifications/messages";
+import { notify } from "@/lib/notifications/notify";
 
 // Sharing a Service with other users. Everything runs as the signed-in user (RLS applies),
 // except the email -> user id lookup, which needs the secret key.
@@ -15,10 +17,19 @@ export interface MemberRow {
 }
 
 // The bell's items: Services the user was added to (from service_members) and everything in the
-// notifications table (migration 009), e.g. devices transferred to them.
+// notifications table (migration 009): devices transferred to them, changes to their Services, etc.
+// Table rows carry the same title/body/url as the push notification (lib/notifications/messages.ts).
 export type NotificationRow =
   | { kind: "shared"; id: string; service_id: string; service_name: string; created_at: string; seen_at: string | null }
-  | { kind: "device_transferred"; id: string; device_name: string; from_email: string; created_at: string; seen_at: string | null };
+  | {
+      kind: Exclude<NotificationKind, "service_shared">;
+      id: string;
+      title: string;
+      body: string;
+      url: string;
+      created_at: string;
+      seen_at: string | null;
+    };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -49,7 +60,7 @@ export async function inviteMember(serviceId: string, email: string): Promise<{ 
 
   const { data: service, error: serviceError } = await supabase
     .from("services")
-    .select("id")
+    .select("id, name")
     .eq("id", serviceId)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -75,13 +86,21 @@ export async function inviteMember(serviceId: string, email: string): Promise<{ 
     return { error: error.message };
   }
 
+  // Push only: the bell already lists Services the user was added to (from service_members).
+  await notify(
+    userId as string,
+    "service_shared",
+    { service_id: serviceId, service_name: (service as { name: string }).name, by_email: user.email ?? "Someone" },
+    { store: false },
+  );
   revalidateService(serviceId);
   return { member: data as MemberRow };
 }
 
-// Owner removes a member.
+// Owner removes a member, who gets a notification.
 export async function removeMember(serviceId: string, userId: string): Promise<void> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  const { data: service } = await supabase.from("services").select("name").eq("id", serviceId).maybeSingle();
   const { data, error } = await supabase
     .from("service_members")
     .delete()
@@ -90,12 +109,20 @@ export async function removeMember(serviceId: string, userId: string): Promise<v
     .select("user_id");
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error("Member not found.");
+  if (userId !== user.id) {
+    await notify(userId, "member_removed", {
+      service_id: serviceId,
+      service_name: (service as { name: string } | null)?.name ?? "a service",
+      by_email: user.email ?? "The owner",
+    });
+  }
   revalidateService(serviceId);
 }
 
-// A member leaves a Service shared with them.
+// A member leaves a Service shared with them; the owner gets a notification.
 export async function leaveService(serviceId: string): Promise<void> {
   const { supabase, user } = await requireUser();
+  const { data: service } = await supabase.from("services").select("name, owner_id").eq("id", serviceId).maybeSingle();
   const { data, error } = await supabase
     .from("service_members")
     .delete()
@@ -104,6 +131,14 @@ export async function leaveService(serviceId: string): Promise<void> {
     .select("service_id");
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error("You are not a member of this service.");
+  const svc = service as { name: string; owner_id: string } | null;
+  if (svc && svc.owner_id !== user.id) {
+    await notify(svc.owner_id, "member_left", {
+      service_id: serviceId,
+      service_name: svc.name,
+      member_email: user.email ?? "A member",
+    });
+  }
   revalidatePath("/");
   revalidatePath("/shared");
   redirect("/shared");
@@ -144,16 +179,17 @@ export async function listNotifications(): Promise<NotificationRow[]> {
   type Notice = { id: number; kind: string; data: Record<string, unknown> | null; created_at: string; seen_at: string | null };
   const rest: NotificationRow[] = [];
   for (const n of (other.error ? [] : (other.data ?? [])) as Notice[]) {
-    if (n.kind === "device_transferred") {
-      rest.push({
-        kind: "device_transferred",
-        id: `n:${n.id}`,
-        device_name: String(n.data?.device_name ?? "a device"),
-        from_email: String(n.data?.from_email ?? "Someone"),
-        created_at: n.created_at,
-        seen_at: n.seen_at,
-      });
-    }
+    // "service_shared" rows are never stored (the service_members item above covers them).
+    if (n.kind === "service_shared") continue;
+    const message = describeNotification(n.kind, n.data);
+    if (!message) continue;
+    rest.push({
+      kind: n.kind as Exclude<NotificationKind, "service_shared">,
+      id: `n:${n.id}`,
+      ...message,
+      created_at: n.created_at,
+      seen_at: n.seen_at,
+    });
   }
 
   return [...shared, ...rest].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 50);

@@ -8,9 +8,11 @@ import { listNotifications, markNotificationsSeen, type NotificationRow } from "
 import { cn } from "@/components/ui/cn";
 import { timeAgo } from "@/lib/time";
 
-// Top-bar bell: Services the user was added to, devices transferred to them. Opening the dropdown marks them all seen.
+// Top-bar bell: Services the user was added to, devices transferred to them, changes other people
+// made to their Services and devices. Opening the dropdown marks them all seen.
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [offerPush, setOfferPush] = useState(false);
   const [items, setItems] = useState<NotificationRow[] | null>(null);
   const [error, setError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -27,6 +29,14 @@ export default function NotificationBell() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Point to Settings while this browser could get push notifications but hasn't been asked yet.
+  useEffect(() => {
+    if (!open) return;
+    const supported =
+      !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    setOfferPush(supported && Notification.permission === "default");
+  }, [open]);
 
   // Closing clears unread state locally (the server copy was marked seen on open).
   const close = useCallback(() => {
@@ -113,9 +123,7 @@ export default function NotificationBell() {
                             You were added to <span className="font-medium">{n.service_name}</span>
                           </>
                         ) : (
-                          <>
-                            {n.from_email} transferred <span className="font-medium">{n.device_name}</span> to you
-                          </>
+                          n.body
                         )}
                       </span>
                       <span className="block text-[12px] text-muted" title={new Date(n.created_at).toLocaleString()}>
@@ -132,7 +140,7 @@ export default function NotificationBell() {
                         {body}
                       </ServiceLink>
                     ) : (
-                      <Link href="/devices" onClick={close} className={cls}>
+                      <Link href={n.url} onClick={close} className={cls}>
                         {body}
                       </Link>
                     )}
@@ -140,6 +148,15 @@ export default function NotificationBell() {
                 );
               })}
             </ul>
+          )}
+          {offerPush && (
+            <Link
+              href="/settings#notifications"
+              onClick={close}
+              className="block border-t border-border px-3 py-2 text-[12px] text-muted transition-colors hover:bg-panel-hover hover:text-fg"
+            >
+              Get these on this device even when the portal is closed: <span className="text-accent">turn on push notifications</span>
+            </Link>
           )}
         </div>
       )}
