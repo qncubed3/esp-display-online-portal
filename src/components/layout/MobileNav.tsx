@@ -86,8 +86,9 @@ export default function MobileNav({ children }: { children: ReactNode }) {
       <div
         aria-hidden="true"
         onClick={close}
-        className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-200 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
+        // Fades in over 200ms ease-out, out a little faster with ease-in; no fade with reduced motion.
+        className={`fixed inset-0 z-40 bg-black/60 transition-[opacity,visibility] motion-reduce:transition-none ${
+          open ? "opacity-100 duration-200 ease-out" : "pointer-events-none invisible opacity-0 duration-150 ease-in"
         }`}
       />
 
@@ -103,8 +104,9 @@ export default function MobileNav({ children }: { children: ReactNode }) {
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("a")) close();
         }}
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-border bg-panel shadow-2xl outline-none transition-[transform,visibility] duration-200 ${
-          open ? "translate-x-0" : "invisible -translate-x-full"
+        // Always mounted so it can slide out: `visibility` flips only after the exit transform finishes.
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-border bg-panel shadow-2xl outline-none transition-[transform,visibility] will-change-transform motion-reduce:transition-none ${
+          open ? "translate-x-0 duration-200 ease-out" : "invisible -translate-x-full duration-150 ease-in"
         }`}
       >
         {children}
