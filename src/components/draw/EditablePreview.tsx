@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { OP_BY_NAME, SCREEN_HEIGHT, SCREEN_WIDTH, type DrawRow, type WireOp } from "@/lib/draw/ops";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type DrawRow, type WireOp } from "@/lib/draw/ops";
 import { applyDrag, canDrag, handlesFor } from "@/lib/draw/geometry";
 import { opBounds } from "@/lib/draw/preview";
 import DevicePreview, { screenPoint } from "./DevicePreview";
@@ -28,25 +28,27 @@ interface Drag {
 export default function EditablePreview({
   rows,
   ops,
+  rowIds,
   selectedId,
   onSelect,
   onRowChange,
 }: {
   rows: DrawRow[];
   ops: WireOp[];
+  /** The row each op came from (toWireOpsWithRows). */
+  rowIds: string[];
   selectedId: string | null;
   onSelect(id: string | null): void;
   onRowChange(row: DrawRow): void;
 }) {
-  // toWireOps skips unknown ops, so op i belongs to the i-th row with a known op.
-  const opRows = useMemo(() => rows.filter((r) => OP_BY_NAME[r.op]), [rows]);
+  const rowById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
   const bounds = useMemo(() => opBounds(ops), [ops]);
   const drag = useRef<Drag | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  const selIndex = opRows.findIndex((r) => r.id === selectedId);
-  const selRow = selIndex >= 0 ? opRows[selIndex] : null;
-  const selBox = selIndex >= 0 ? bounds[selIndex] : null;
+  // A row can make several ops (e.g. "text"); its box is the one op that draws something.
+  const selRow = selectedId ? rowById.get(selectedId) ?? null : null;
+  const selBox = selRow ? (bounds.find((b, i) => b && rowIds[i] === selRow.id) ?? null) : null;
   const movable = selRow ? canDrag(selRow) : false;
   const handles = selRow && movable ? handlesFor(selRow) : [];
 
@@ -99,7 +101,8 @@ export default function EditablePreview({
       onSelect(null);
       return;
     }
-    const row = opRows[hit];
+    const row = rowById.get(rowIds[hit]);
+    if (!row) return;
     onSelect(row.id);
     // Bring the row's card to the top of the visible area.
     requestAnimationFrame(() => {

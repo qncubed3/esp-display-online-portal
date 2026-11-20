@@ -184,6 +184,7 @@ function caseLines(): string {
   const seen = new Map<number, string>();
   const out: string[] = [];
   for (const def of OPS) {
+    if (def.expand) continue; // editor-only: the server expands it into other ops
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(def.op)) fail(def, "op name is not a C++ identifier");
     const h = fnv1a(def.op);
     const clash = seen.get(h);

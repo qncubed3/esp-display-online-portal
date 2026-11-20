@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Braces, List, LoaderCircle, Plus, RefreshCw } from "lucide-react";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
-import { newRow, toWireOps, type DrawRow } from "@/lib/draw/ops";
+import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
 import EditablePreview from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
@@ -24,10 +24,10 @@ export default function DrawSection(props: {
 }) {
   const { rows, onChange, vars, varsError, refreshing, onRefreshData } = props;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [addOp, setAddOp] = useState("drawString");
+  const [addOp, setAddOp] = useState("text");
   const [mode, setMode] = useState<"rows" | "json">("rows");
 
-  const ops = useMemo(() => toWireOps(rows, vars), [rows, vars]);
+  const { ops, rowIds } = useMemo(() => toWireOpsWithRows(rows, vars), [rows, vars]);
   const varNames = useMemo(() => Object.keys(vars).sort(), [vars]);
 
   const add = () => {
@@ -100,6 +100,7 @@ export default function DrawSection(props: {
           <EditablePreview
             rows={rows}
             ops={ops}
+            rowIds={rowIds}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}

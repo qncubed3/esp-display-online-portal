@@ -358,6 +358,11 @@ const LAYOUT: Record<string, ParamLine[]> = {
     { label: "Text", keys: ["text"], span: true },
     { label: "Position", keys: ["x", "y", "font"] },
   ],
+  text: [
+    { label: "Text", keys: ["text"], span: true },
+    { label: "Position", keys: ["x", "y", "datum"] },
+    { label: "Style", keys: ["font", "size"] },
+  ],
 };
 
 // "X0" -> "X", "Width" -> "W", "Radius" -> "R".

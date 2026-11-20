@@ -20,10 +20,12 @@ export interface Field {
 }
 
 export interface OpDef {
-  op: string; // TFT_eSPI method name, sent to the device as-is
+  op: string; // TFT_eSPI method name, sent to the device as-is (unless `expand` is set)
   label: string;
   group: "Screen" | "Shapes" | "Text";
   fields: Field[];
+  /** Editor-only op: turned into these device ops (in toWireOps), so the firmware never sees it. */
+  expand?(args: (string | number)[]): WireOp[];
 }
 
 // One row in the Draw editor, as stored in services.draw_ops.
@@ -74,19 +76,41 @@ export const OPS: OpDef[] = [
   { op: "fillTriangle", label: "Triangle", group: "Shapes", fields: [...pt(0, 10, 40), ...pt(1, 30, 10), ...pt(2, 50, 40), color()] },
 
   {
-    op: "setTextColor", label: "Text colour", group: "Text",
+    // Everything for one piece of text on one card. Expands to the four TFT_eSPI calls below.
+    // Background is last so it can be left empty (transparent).
+    op: "text", label: "Text", group: "Text",
+    fields: [
+      { key: "text", label: "Text", type: "text", default: "Hello" },
+      x(8), y(8),
+      { key: "font", label: "Font", type: "select", default: 1, options: [
+        { value: 1, label: "1: small (8px)" }, { value: 2, label: "2: 16px" }, { value: 4, label: "4: 26px" },
+      ] },
+      { key: "size", label: "Size", type: "select", default: 1, options: [1, 2, 3, 4, 5, 6, 7].map((n) => ({ value: n, label: `${n}×` })) },
+      { key: "datum", label: "Anchor", type: "select", default: "TL", options: DATUMS.map((d) => ({ value: d, label: d })) },
+      color("fg", "Text"),
+      { ...color("bg", "Background", ""), optional: true },
+    ],
+    expand: ([text, x, y, font, size, datum, fg, bg]) => [
+      bg === undefined || bg === "" ? ["setTextColor", fg] : ["setTextColor", fg, bg],
+      ["setTextSize", size],
+      ["setTextDatum", datum],
+      ["drawString", text, x, y, font],
+    ],
+  },
+  {
+    op: "setTextColor", label: "Text colour (for later text)", group: "Text",
     fields: [color("fg", "Text"), { ...color("bg", "Background", ""), optional: true }],
   },
   {
-    op: "setTextSize", label: "Text size", group: "Text",
+    op: "setTextSize", label: "Text size (for later text)", group: "Text",
     fields: [{ key: "size", label: "Size", type: "select", default: 1, options: [1, 2, 3, 4, 5, 6, 7].map((n) => ({ value: n, label: `${n}×` })) }],
   },
   {
-    op: "setTextDatum", label: "Text anchor", group: "Text",
+    op: "setTextDatum", label: "Text anchor (for later text)", group: "Text",
     fields: [{ key: "datum", label: "Anchor", type: "select", default: "TL", options: DATUMS.map((d) => ({ value: d, label: d })) }],
   },
   {
-    op: "drawString", label: "Text", group: "Text",
+    op: "drawString", label: "Text string only", group: "Text",
     fields: [
       { key: "text", label: "Text", type: "text", default: "Hello" },
       x(8), y(8),
@@ -115,7 +139,13 @@ export function fill(value: string, vars: Record<string, unknown>): string {
 
 // Saved rows + Data section variables → what the ESP32 (and the preview) draws.
 export function toWireOps(rows: DrawRow[], vars: Record<string, unknown>): WireOp[] {
+  return toWireOpsWithRows(rows, vars).ops;
+}
+
+// Same, plus which row each op came from (one row can make several ops, e.g. "text").
+export function toWireOpsWithRows(rows: DrawRow[], vars: Record<string, unknown>): { ops: WireOp[]; rowIds: string[] } {
   const out: WireOp[] = [];
+  const rowIds: string[] = [];
   for (const row of rows) {
     const def = OP_BY_NAME[row.op];
     if (!def) continue;
@@ -127,9 +157,11 @@ export function toWireOps(rows: DrawRow[], vars: Record<string, unknown>): WireO
       if (f.type === "int" || (f.type === "select" && typeof f.default === "number")) v = Math.round(Number(v) || 0);
       args.push(v);
     }
-    out.push([def.op, ...args]);
+    const made: WireOp[] = def.expand ? def.expand(args) : [[def.op, ...args]];
+    out.push(...made);
+    for (let i = 0; i < made.length; i++) rowIds.push(row.id);
   }
-  return out;
+  return { ops: out, rowIds };
 }
 
 // Named colours offered as swatches in the editor (TFT_eSPI's constants, as RGB).
