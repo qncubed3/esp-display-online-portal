@@ -97,14 +97,22 @@ export default function AiHelperButton({
           <pre
             tabIndex={0}
             aria-label="Prompt"
-            className="h-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[#121212] p-3 pr-24 font-mono text-[12px] leading-5 text-fg focus:border-border-strong focus:outline-none"
+            className="h-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[#121212] p-3 pr-14 font-mono text-[12px] leading-5 text-fg focus:border-border-strong focus:outline-none"
           >
             {skill}
           </pre>
-          <Button size="sm" variant="primary" onClick={() => void copy()} className="absolute right-4 top-2">
+          {/* right-6 leaves room for the box's scrollbar, so the button never sits on top of it. */}
+          <button
+            type="button"
+            onClick={() => void copy()}
+            aria-label={copied === "ok" ? "Copied" : "Copy prompt"}
+            title={copied === "ok" ? "Copied" : copied === "fail" ? "Copy failed; select the text and copy it" : "Copy prompt"}
+            className={`absolute right-6 top-2.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-white/10 bg-white/5 backdrop-blur-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent ${
+              copied === "ok" ? "text-accent" : copied === "fail" ? "text-[#ff8a8e]" : "text-muted hover:text-fg"
+            }`}
+          >
             {copied === "ok" ? <Check size={14} /> : <Copy size={14} />}
-            {copied === "ok" ? "Copied" : copied === "fail" ? "Copy failed" : "Copy"}
-          </Button>
+          </button>
         </div>
       </Dialog>
     </>
