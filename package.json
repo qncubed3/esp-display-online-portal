@@ -8,6 +8,7 @@
     "prebuild": "node scripts/gen-templates.mjs",
     "build": "next build",
     "gen:templates": "node scripts/gen-templates.mjs",
+    "check:template": "node scripts/check-template.mjs",
     "start": "next start",
     "lint": "eslint"
   },
