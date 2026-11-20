@@ -4,7 +4,8 @@
 //   GET /api/device/frame?since=<id> 304 when the frame hasn't changed
 //
 // Responses: 200 Frame JSON | 304 unchanged | 204 service disabled | 401 bad key.
-// Every response that the device should act on carries X-Next-Poll (seconds).
+// Every response that the device should act on carries X-Next-Poll (seconds), and every reply
+// carries X-Poll-Interval: the device's configured interval, which the firmware stores.
 //
 // Every request with a valid key is logged to device_polls (see src/lib/polls/log.ts).
 // Optional device headers recorded with it: X-RSSI, X-Heap, X-Uptime, X-FW.
@@ -138,9 +139,14 @@ async function serve(
     .eq("id", device.id);
   if (seenError) console.error("[device/frame] last_seen_at update failed", seenError.message);
 
+  const pollInterval = device.poll_seconds ?? NEXT_POLL_S;
+
   if (!service.enabled) {
     return {
-      response: new Response(null, { status: 204, headers: { ...noStore, "X-Next-Poll": String(DISABLED_POLL_S) } }),
+      response: new Response(null, {
+        status: 204,
+        headers: { ...noStore, "X-Next-Poll": String(DISABLED_POLL_S), "X-Poll-Interval": String(pollInterval) },
+      }),
       status: 204,
       bytes: 0,
       ops: null,
@@ -158,16 +164,20 @@ async function serve(
     ? errorFrameOps(dataError)
     : toWireOps(Array.isArray(service.draw_ops) ? service.draw_ops : [], vars);
 
-  const nextPoll = device.poll_seconds ?? NEXT_POLL_S;
   const id = createHash("sha256").update(JSON.stringify(ops)).digest("hex").slice(0, 12);
-  const headers = { ...noStore, "X-Next-Poll": String(nextPoll), ETag: `"${id}"` };
+  const headers = {
+    ...noStore,
+    "X-Next-Poll": String(pollInterval),
+    "X-Poll-Interval": String(pollInterval),
+    ETag: `"${id}"`,
+  };
   const base = { ops: ops.length, dataMs, error: dataError ?? null };
 
   if (url.searchParams.get("since") === id) {
     return { response: new Response(null, { status: 304, headers }), status: 304, bytes: 0, ...base };
   }
 
-  const frame: Frame = { v: 1, id, next: nextPoll, ops };
+  const frame: Frame = { v: 1, id, next: pollInterval, poll: pollInterval, ops };
   const body = JSON.stringify(frame);
   return {
     response: new Response(body, { status: 200, headers: { ...headers, "Content-Type": "application/json" } }),

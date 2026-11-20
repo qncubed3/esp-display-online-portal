@@ -24,7 +24,7 @@ export interface FirmwareFile {
 }
 
 export const SKETCH_DIR = "EspDisplay";
-export const FW_VERSION = "EspDisplay/1.0.0";
+export const FW_VERSION = "EspDisplay/1.1.0";
 export const PLACEHOLDER_SSID = "YOUR_WIFI";
 export const PLACEHOLDER_PASSWORD = "YOUR_PASSWORD";
 export const PLACEHOLDER_KEY = "PASTE_DEVICE_KEY_HERE";
@@ -348,10 +348,12 @@ function sketchIno(): string {
 // The op player below is generated from the portal's Draw ops; don't edit it by hand.
 //
 // Protocol: GET SERVICE_URL?since=<id> with "Authorization: Bearer <key>".
-//   200 JSON {v, id, next, ops}  draw ops, poll again in next seconds
+//   200 JSON {v, id, next, poll, ops}  draw ops, poll again in next seconds
 //   304                          unchanged
 //   204                          Service disabled, poll again in X-Next-Poll seconds
 //   401                          device key rejected
+// "poll" (and the X-Poll-Interval header on every reply) is this device's poll interval, set
+// in the portal. It's kept in pollIntervalS and used whenever a reply doesn't say otherwise.
 //
 // Libraries: TFT_eSPI, ArduinoJson 7.x. Board: ESP32 Dev Module.
 
@@ -399,6 +401,7 @@ String shownMessage;        // the message screen showing, so it isn't redrawn e
 bool setupNeeded = false;   // config.h still has placeholders
 bool wifiWasUp = false;
 uint32_t nextPollAt = 0;    // millis() of the next poll
+uint32_t pollIntervalS = DEFAULT_POLL_S;  // this device's poll interval, from the server
 uint32_t lastWifiRetry = 0;
 
 // ---------------------------------------------------------------------------
@@ -562,7 +565,8 @@ void playFrame(JsonArrayConst ops) {
 }
 
 // Parse and draw a frame body. Returns false (and draws nothing) if it isn't a v1 frame.
-bool playJson(const String& body, String& error, long& next) {
+// next and poll are the frame's "next" and "poll" fields (0 if missing).
+bool playJson(const String& body, String& error, long& next, long& poll) {
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, body);
   if (err) {
@@ -577,6 +581,7 @@ bool playJson(const String& body, String& error, long& next) {
   lastId = doc["id"] | "";
   frameJson = body;
   next = doc["next"] | 0L;
+  poll = doc["poll"] | 0L;
   return true;
 }
 
@@ -584,10 +589,18 @@ bool playJson(const String& body, String& error, long& next) {
 // Polling
 
 uint32_t clampPoll(long s) {
-  if (s <= 0) return DEFAULT_POLL_S;
+  if (s <= 0) return pollIntervalS;
   if (s < (long)MIN_POLL_S) return MIN_POLL_S;
   if (s > (long)MAX_POLL_S) return MAX_POLL_S;
   return (uint32_t)s;
+}
+
+// Store this device's poll interval when the server sends one.
+void setPollInterval(long s) {
+  if (s <= 0) return;
+  uint32_t v = s < (long)MIN_POLL_S ? MIN_POLL_S : s > (long)MAX_POLL_S ? MAX_POLL_S : (uint32_t)s;
+  if (v != pollIntervalS) Serial.printf("[poll] interval now %lu s\n", (unsigned long)v);
+  pollIntervalS = v;
 }
 
 // One request to the server. Returns seconds until the next poll.
@@ -604,18 +617,19 @@ uint32_t poll() {
 
   if (!http.begin(client, url)) {
     showFailure("Bad server URL", clip(String(SERVICE_URL), 40));
-    return DEFAULT_POLL_S;
+    return pollIntervalS;
   }
   http.addHeader("Authorization", String("Bearer ") + DEVICE_KEY);
   http.addHeader("X-RSSI", String((int)WiFi.RSSI()));
   http.addHeader("X-Heap", String(ESP.getFreeHeap()));
   http.addHeader("X-Uptime", String((uint32_t)(esp_timer_get_time() / 1000000LL)));
   http.addHeader("X-FW", FW_VERSION);
-  const char* headerKeys[] = {"X-Next-Poll"};
-  http.collectHeaders(headerKeys, 1);
+  const char* headerKeys[] = {"X-Next-Poll", "X-Poll-Interval"};
+  http.collectHeaders(headerKeys, 2);
 
   int code = http.GET();
   long headerNext = http.header("X-Next-Poll").toInt();  // 0 if missing
+  setPollInterval(http.header("X-Poll-Interval").toInt());
   String body;
   if (code == HTTP_CODE_OK) body = http.getString();
   http.end();
@@ -624,11 +638,12 @@ uint32_t poll() {
 
   if (code == HTTP_CODE_OK) {
     String error;
-    long next = 0;
-    if (!playJson(body, error, next)) {
+    long next = 0, interval = 0;
+    if (!playJson(body, error, next, interval)) {
       showFailure("Bad response", error);
       return clampPoll(headerNext);
     }
+    setPollInterval(interval);
     Serial.printf("[poll] drew frame %s (%u bytes)\n", lastId.c_str(), body.length());
     return clampPoll(next > 0 ? next : headerNext);
   }
@@ -636,10 +651,11 @@ uint32_t poll() {
   if (code == HTTP_CODE_NOT_MODIFIED || code == HTTP_CODE_NO_CONTENT) {
     if (statusDot) {
       // Back online: redraw the frame to remove the red dot.
+      // Its stored "poll" may be stale, so it's ignored here; the header above is current.
       String error;
-      long next = 0;
+      long next = 0, staleInterval = 0;
       String saved = frameJson;
-      if (!playJson(saved, error, next)) frameOnScreen = false;
+      if (!playJson(saved, error, next, staleInterval)) frameOnScreen = false;
     }
     if (code == HTTP_CODE_NO_CONTENT && !frameOnScreen) {
       showMessage(TFT_YELLOW, "Service is turned off", "Turn it on in the portal.", "Checking again later.");

@@ -43,6 +43,7 @@ export interface Frame {
   v: 1;
   id: string; // hash of ops; the device sends it back as ?since=
   next: number; // seconds until the next poll
+  poll: number; // this device's poll interval (the device stores it); also sent as X-Poll-Interval
   ops: WireOp[];
 }
 
