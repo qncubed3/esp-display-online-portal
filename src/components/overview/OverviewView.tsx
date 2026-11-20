@@ -168,7 +168,7 @@ function Skeleton() {
           <div key={i} className="h-[62px] animate-pulse rounded-md border border-border bg-panel" />
         ))}
       </div>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="h-[186px] animate-pulse rounded-md border border-border bg-panel" />
         <div className="h-[186px] animate-pulse rounded-md border border-border bg-panel" />
       </div>
@@ -207,7 +207,7 @@ function OverviewBody({ data }: { data: Overview }) {
           No polls in the {RANGE_LABEL[data.range]}.
         </p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <Card
             title="Polls"
             aside={
@@ -264,7 +264,7 @@ function OverviewBody({ data }: { data: Overview }) {
         </div>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <ServiceTable services={data.services} range={data.range} />
         </div>

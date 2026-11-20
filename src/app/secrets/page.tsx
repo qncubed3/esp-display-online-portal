@@ -9,7 +9,7 @@ import type { SecretRow } from "@/lib/secrets/actions";
 export default function SecretsPage() {
   return (
     <AppShell crumbs={[{ label: "Secrets" }]}>
-      <div className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mx-auto max-w-4xl px-4 md:px-6 py-8">
         <div className="mb-2 flex items-center gap-2">
           <KeyRound size={18} className="text-muted" />
           <h1 className="text-xl font-medium">Secrets</h1>

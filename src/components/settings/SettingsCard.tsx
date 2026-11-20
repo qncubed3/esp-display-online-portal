@@ -17,13 +17,13 @@ export default function SettingsCard({
 }) {
   return (
     <section className={cn("rounded-md border bg-panel", danger ? "border-danger/40" : "border-border")}>
-      <div className="border-b border-border px-5 py-4">
+      <div className="border-b border-border px-4 py-4 md:px-5">
         <h2 className={cn("text-sm font-medium", danger && "text-[#ff8a8e]")}>{title}</h2>
         {description && <p className="mt-1 text-[13px] text-muted">{description}</p>}
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div className="px-4 py-4 md:px-5">{children}</div>
       {footer && (
-        <div className="flex items-center justify-end gap-3 border-t border-border px-5 py-3">{footer}</div>
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border px-4 py-3 md:px-5">{footer}</div>
       )}
     </section>
   );

@@ -7,7 +7,7 @@ export const metadata = { title: "Overview" };
 export default function OverviewPage() {
   return (
     <AppShell crumbs={[{ label: "Overview" }]}>
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
         <OverviewView />
       </div>
     </AppShell>

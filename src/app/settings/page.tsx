@@ -16,7 +16,7 @@ export const metadata = { title: "Settings" };
 export default function SettingsPage() {
   return (
     <AppShell crumbs={[{ label: "Settings" }]}>
-      <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 md:px-6 py-8">
         <h1 className="text-xl font-medium">Settings</h1>
 
         <SettingsCard title="Account" description="Your sign-in details.">

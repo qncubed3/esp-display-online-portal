@@ -76,7 +76,7 @@ export default function DocsPage() {
 
   return (
     <AppShell crumbs={[{ label: "Docs" }]}>
-      <div className="mx-auto flex max-w-6xl gap-10 px-6 py-8">
+      <div className="mx-auto flex max-w-6xl gap-10 px-4 md:px-6 py-8">
         <nav aria-label="On this page" className="sticky top-8 hidden w-44 shrink-0 self-start lg:block">
           <p className="mb-2 text-[12px] font-medium text-muted">On this page</p>
           <ul className="space-y-0.5 text-[13px]">

@@ -111,7 +111,7 @@ export default function SecretsManager({ initial }: { initial: SecretRow[] }) {
       )}
 
       {secrets.length === 0 ? (
-        <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-6 py-14 text-center">
+        <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-panel px-4 py-14 text-center sm:px-6">
           <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted">
             <KeyRound size={18} />
           </span>
@@ -127,7 +127,7 @@ export default function SecretsManager({ initial }: { initial: SecretRow[] }) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border bg-panel">
-          <table className="w-full table-fixed text-[13px]">
+          <table className="w-full min-w-[560px] table-fixed text-[13px]">
             <thead>
               <tr className="border-b border-border text-left text-[12px] text-muted">
                 <th className="w-[32%] px-4 py-2 font-normal">Name</th>
