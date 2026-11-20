@@ -35,12 +35,10 @@ export default function ServiceEditor({
   serviceId,
   initialCode,
   initialRows,
-  pollSeconds,
 }: {
   serviceId: string;
   initialCode: string;
   initialRows: DrawRow[];
-  pollSeconds: number;
 }) {
   const [code, setCode] = useState(initialCode);
   const [rows, setRows] = useState<DrawRow[]>(initialRows);
@@ -123,7 +121,7 @@ export default function ServiceEditor({
   return (
     <div className="mt-6 flex flex-col gap-5">
       <Section>
-        <DevicesPanel serviceId={serviceId} pollSeconds={pollSeconds} />
+        <DevicesPanel serviceId={serviceId} />
       </Section>
 
       <ActivitySection serviceId={serviceId} />

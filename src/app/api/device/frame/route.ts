@@ -48,13 +48,13 @@ function errorFrameOps(message: string): WireOp[] {
 
 interface DeviceWithService {
   id: string;
+  poll_seconds?: number | null;
   service: {
     id: string;
     owner_id: string;
     enabled: boolean;
     data_code: string;
     draw_ops: DrawRow[] | null;
-    poll_seconds?: number | null;
   } | null;
 }
 
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("devices")
-    .select("id, service:services!inner(*)")
+    .select("*, service:services!inner(id, owner_id, enabled, data_code, draw_ops)")
     .eq("key_hash", hashKey(key))
     .maybeSingle();
   if (error) {
@@ -158,7 +158,7 @@ async function serve(
     ? errorFrameOps(dataError)
     : toWireOps(Array.isArray(service.draw_ops) ? service.draw_ops : [], vars);
 
-  const nextPoll = service.poll_seconds ?? NEXT_POLL_S;
+  const nextPoll = device.poll_seconds ?? NEXT_POLL_S;
   const id = createHash("sha256").update(JSON.stringify(ops)).digest("hex").slice(0, 12);
   const headers = { ...noStore, "X-Next-Poll": String(nextPoll), ETag: `"${id}"` };
   const base = { ops: ops.length, dataMs, error: dataError ?? null };

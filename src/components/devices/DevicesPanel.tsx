@@ -7,9 +7,9 @@ import {
   deleteDevice,
   listDevices,
   regenerateDeviceKey,
+  setDevicePollSeconds,
   type DeviceRow,
 } from "@/lib/devices/actions";
-import { updateService } from "@/app/services/[id]/actions";
 import SetupFilesDialog from "./SetupFilesDialog";
 
 const ONLINE_MS = 2 * 60 * 1000;
@@ -118,8 +118,8 @@ const POLL_OPTIONS: { value: number; label: string }[] = [
   { value: 3600, label: "Every hour" },
 ];
 
-// Saves as soon as it changes; devices pick the new value up on their next poll.
-function PollFrequency({ serviceId, initial }: { serviceId: string; initial: number }) {
+// Per-device dropdown. Saves as soon as it changes; the device picks it up on its next poll.
+function PollFrequency({ deviceId, initial }: { deviceId: string; initial: number }) {
   const [value, setValue] = useState(initial);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const options = POLL_OPTIONS.some((o) => o.value === value) ? POLL_OPTIONS : [...POLL_OPTIONS, { value, label: `Every ${value} s` }];
@@ -129,7 +129,7 @@ function PollFrequency({ serviceId, initial }: { serviceId: string; initial: num
     setValue(next);
     setState("saving");
     try {
-      await updateService(serviceId, { pollSeconds: next });
+      await setDevicePollSeconds(deviceId, next);
       setState("saved");
     } catch {
       setValue(prev);
@@ -138,13 +138,13 @@ function PollFrequency({ serviceId, initial }: { serviceId: string; initial: num
   }
 
   return (
-    <label className="flex items-center gap-2 text-[#a0a0a0]" title="How often devices ask for a new screen. Each poll counts towards Vercel's free-tier limit.">
-      <span>Poll</span>
+    <label className="flex items-center gap-2" title="How often this device asks for a new screen. Each poll counts towards Vercel's free-tier limit.">
+      <span className="sr-only">Poll frequency</span>
       <select
         value={value}
         onChange={(e) => void change(Number(e.target.value))}
         disabled={state === "saving"}
-        className="h-7 cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none focus:border-[#3e3e3e]"
+        className="h-7 cursor-pointer rounded-md border border-[#2e2e2e] bg-[#121212] px-2 text-[13px] text-[#ededed] outline-none hover:border-[#3e3e3e] focus:border-[#3e3e3e]"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -159,7 +159,7 @@ function PollFrequency({ serviceId, initial }: { serviceId: string; initial: num
   );
 }
 
-export default function DevicesPanel({ serviceId, pollSeconds = 30 }: { serviceId: string; pollSeconds?: number }) {
+export default function DevicesPanel({ serviceId }: { serviceId: string }) {
   const [devices, setDevices] = useState<DeviceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // device id, or "add"
@@ -234,8 +234,6 @@ export default function DevicesPanel({ serviceId, pollSeconds = 30 }: { serviceI
           <h2 className="text-[14px] font-medium">Devices</h2>
           <p className="text-[#a0a0a0]">ESP32 screens that show this service.</p>
         </div>
-        <div className="flex items-center gap-3">
-        <PollFrequency serviceId={serviceId} initial={pollSeconds} />
         {!adding && (
           <button
             type="button"
@@ -245,7 +243,6 @@ export default function DevicesPanel({ serviceId, pollSeconds = 30 }: { serviceI
             <Plus size={14} /> Add device
           </button>
         )}
-        </div>
       </div>
 
       {adding && (
@@ -300,20 +297,21 @@ export default function DevicesPanel({ serviceId, pollSeconds = 30 }: { serviceI
             <tr className="border-b border-[#2e2e2e] text-[12px] text-[#a0a0a0]">
               <th className="px-3 py-2 font-normal">Name</th>
               <th className="px-3 py-2 font-normal">Last seen</th>
+              <th className="px-3 py-2 font-normal">Polls</th>
               <th className="w-px px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {devices === null && (
               <tr>
-                <td colSpan={3} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={4} className="px-3 py-6 text-center text-[#a0a0a0]">
                   <Loader2 size={14} className="inline animate-spin" /> Loading…
                 </td>
               </tr>
             )}
             {devices?.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={4} className="px-3 py-6 text-center text-[#a0a0a0]">
                   No devices yet. Add one to get a key for your ESP32.
                 </td>
               </tr>
@@ -333,6 +331,9 @@ export default function DevicesPanel({ serviceId, pollSeconds = 30 }: { serviceI
                   </td>
                   <td className="px-3 py-2 text-[#a0a0a0]" title={d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : undefined}>
                     {relativeTime(d.last_seen_at, now)}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <PollFrequency deviceId={d.id} initial={d.poll_seconds ?? 30} />
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-1">

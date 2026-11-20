@@ -10,9 +10,12 @@ export interface DeviceRow {
   name: string;
   last_seen_at: string | null;
   created_at: string;
+  /** Seconds between polls; missing until migration 006 has run. */
+  poll_seconds?: number;
 }
 
-const COLUMNS = "id, service_id, name, last_seen_at, created_at";
+// "*" rather than a column list, so the panel still loads before migration 006 adds poll_seconds.
+const COLUMNS = "*";
 
 function revalidateService(serviceId: string) {
   revalidatePath(`/services/${serviceId}`, "layout");
@@ -55,6 +58,17 @@ export async function deleteDevice(deviceId: string): Promise<void> {
 }
 
 // Replaces a device's key; the old key stops working immediately. Returns the new key (shown once).
+// How often this device polls (15 s to 1 h); it picks the new value up on its next poll.
+export async function setDevicePollSeconds(deviceId: string, seconds: number): Promise<void> {
+  const s = Math.round(seconds);
+  if (!(s >= 15 && s <= 3600)) throw new Error("Poll frequency must be between 15 seconds and 1 hour.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("devices").update({ poll_seconds: s }).eq("id", deviceId).select("service_id");
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Device not found");
+  revalidateService((data[0] as { service_id: string }).service_id);
+}
+
 export async function regenerateDeviceKey(deviceId: string): Promise<string> {
   const supabase = await createClient();
   const key = generateDeviceKey();
