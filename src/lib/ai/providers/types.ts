@@ -26,6 +26,8 @@ export class ProviderError extends Error {
     message: string,
     readonly status?: number,
     readonly timedOut = false,
+    /** The model declined the request (safety); another provider may still answer. */
+    readonly refused = false,
   ) {
     super(message);
   }

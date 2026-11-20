@@ -4,7 +4,7 @@
 // unsaved state. The reply's code blocks come back separately so the editor can apply them.
 // Signed-in owners and members only (the service is read with the user's client, so RLS applies).
 
-import { buildChatSystemPrompt, parseReply, validateDraw } from "@/lib/ai/chat";
+import { buildChatSystemPrompt, parseReply, validateDraw, withEditorState } from "@/lib/ai/chat";
 import { getLlmProvider, isBusyError, ProviderError, type ChatMessage } from "@/lib/ai/providers";
 import type { DrawRow } from "@/lib/draw/ops";
 import { createClient } from "@/lib/supabase/server";
@@ -20,7 +20,8 @@ const MIN_REPAIR_MS = 25_000;
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 8_000;
 const MAX_CODE_CHARS = 30_000;
-const MAX_TOKENS = 4_096;
+// Room for thinking (low effort) plus full Data code and Draw JSON.
+const MAX_TOKENS = 8_192;
 
 // Per-user rate limit. In memory, so per server instance: a guard against runaway use of the
 // provider quota, not a hard limit.
@@ -77,14 +78,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "Too many messages. Wait a few minutes and try again." }, { status: 429 });
   }
 
-  const system = buildChatSystemPrompt({
+  // Fixed instructions (cacheable) as the system prompt; the editor's state rides on the latest message.
+  const system = buildChatSystemPrompt();
+  const chat: ChatMessage[] = (messages as ChatMessage[])
+    .slice(-MAX_MESSAGES)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
+  const latest = chat[chat.length - 1];
+  latest.content = withEditorState(latest.content, {
     code,
     rows: rows as DrawRow[],
     vars: vars && typeof vars === "object" ? (vars as Record<string, string | number | boolean>) : {},
   });
-  const chat: ChatMessage[] = (messages as ChatMessage[])
-    .slice(-MAX_MESSAGES)
-    .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
 
   const deadline = Date.now() + BUDGET_MS;
   try {
