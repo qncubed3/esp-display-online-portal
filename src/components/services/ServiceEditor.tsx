@@ -319,7 +319,7 @@ export default function ServiceEditor({
           varsError={varsError}
           refreshing={refreshing}
           onRefreshData={() => void refreshData()}
-          belowPreview={<AiChat chat={aiChat} />}
+          aiPanel={<AiChat chat={aiChat} />}
         />
       )}
 

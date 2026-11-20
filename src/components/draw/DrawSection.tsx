@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Braces, ChevronDown, List, LoaderCircle, Plus, Redo2, RefreshCw, Undo2 } from "lucide-react";
+import { Braces, ChevronDown, List, LoaderCircle, Plus, Redo2, RefreshCw, Sparkles, Undo2 } from "lucide-react";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
 import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
@@ -24,16 +24,16 @@ export default function DrawSection(props: {
   varsError?: string;
   refreshing: boolean;
   onRefreshData(): void;
-  /** Rendered under the preview (the AI assistant). */
-  belowPreview?: ReactNode;
+  /** The AI assistant, shown in the commands panel's "AI" view. */
+  aiPanel?: ReactNode;
   history: { undo(): void; redo(): void; canUndo: boolean; canRedo: boolean };
 }) {
-  const { rows, onChange, vars, varsError, refreshing, onRefreshData, belowPreview, history } = props;
+  const { rows, onChange, vars, varsError, refreshing, onRefreshData, aiPanel, history } = props;
   // Below xl (stacked layout) the commands start collapsed so the preview is visible right away.
   const [collapsed, setCollapsed] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOp, setAddOp] = useState("text");
-  const [mode, setMode] = useState<"rows" | "json">("rows");
+  const [mode, setMode] = useState<"ai" | "rows" | "json">(aiPanel ? "ai" : "rows");
 
   const { ops, rowIds } = useMemo(() => toWireOpsWithRows(rows, vars), [rows, vars]);
   const varNames = useMemo(() => Object.keys(vars).sort(), [vars]);
@@ -84,6 +84,7 @@ export default function DrawSection(props: {
           <div role="group" aria-label="Editor view" className="inline-flex h-7 shrink-0 rounded-md border border-border bg-bg p-0.5">
             {(
               [
+                ...(aiPanel ? ([["ai", "AI", Sparkles]] as const) : []),
                 ["rows", "Rows", List],
                 ["json", "JSON", Braces],
               ] as const
@@ -120,7 +121,9 @@ export default function DrawSection(props: {
             </button>
           </div>
         )}
-        {mode === "rows" ? (
+        {mode === "ai" ? (
+          aiPanel
+        ) : mode === "rows" ? (
           <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
         ) : (
           <DrawJsonEditor rows={rows} onChange={onChange} />
@@ -155,8 +158,6 @@ export default function DrawSection(props: {
             {refreshing ? "Running…" : "Refresh data"}
           </button>
         </div>
-
-        {belowPreview}
       </aside>
     </div>
   );

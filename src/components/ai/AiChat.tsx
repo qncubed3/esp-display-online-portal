@@ -11,7 +11,7 @@ const SUGGESTIONS = [
   "Make the colour scheme dark blue",
 ];
 
-// The AI assistant panel under the Draw preview. Replies are applied to the editor straight away
+// The AI assistant: the "AI" view of the Draw commands panel. Replies are applied to the editor straight away
 // (unsaved until Save & deploy); the latest change can be undone.
 export default function AiChat({ chat }: { chat: AiChatState }) {
   const { entries, pending, send, undo, clear } = chat;
@@ -48,7 +48,7 @@ export default function AiChat({ chat }: { chat: AiChatState }) {
         )}
       </div>
 
-      <div ref={listRef} className="max-h-80 min-h-0 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite">
+      <div ref={listRef} className="max-h-[26rem] min-h-0 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite">
         {entries.length === 0 && (
           <div className="space-y-2.5">
             <p className="text-[12px] text-muted">
