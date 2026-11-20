@@ -21,7 +21,7 @@ import {
 import { Select } from "@/components/ui/Select";
 import LivePreviewButton from "./LivePreviewButton";
 import SetupFilesDialog from "./SetupFilesDialog";
-import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect, pollLabel } from "./DeviceControls";
+import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, ServiceSelect, pollLabel } from "./DeviceControls";
 
 const ONLINE_MS = 2 * 60 * 1000;
 
@@ -216,6 +216,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
             <tr className="whitespace-nowrap border-b border-[#2e2e2e] text-[12px] text-[#a0a0a0]">
               <th className="px-3 py-2 font-normal">Name</th>
               <th className="px-3 py-2 font-normal">Last seen</th>
+              <th className="px-3 py-2 font-normal">Next update</th>
               <th className="px-3 py-2 font-normal">Service</th>
               <th className="px-3 py-2 font-normal">Update frequency</th>
               <th className="w-px px-3 py-2">
@@ -226,14 +227,14 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
           <tbody>
             {devices === null && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={6} className="px-3 py-6 text-center text-[#a0a0a0]">
                   <Loader2 size={14} className="inline animate-spin" /> Loading…
                 </td>
               </tr>
             )}
             {devices?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={6} className="px-3 py-6 text-center text-[#a0a0a0]">
                   No devices on this service yet. Add one, or move one of your devices here.
                 </td>
               </tr>
@@ -258,6 +259,9 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-[#a0a0a0]" title={d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : undefined}>
                     {relativeTime(d.last_seen_at, now)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <NextPollCountdown lastSeenAt={d.last_seen_at} pollSeconds={d.poll_seconds ?? 30} onDue={() => void load()} />
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5">
                     {d.mine ? (

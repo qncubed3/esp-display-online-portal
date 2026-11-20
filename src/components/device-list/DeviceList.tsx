@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Cpu, ExternalLink, FileCode2, Info, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import LivePreviewButton from "@/components/devices/LivePreviewButton";
 import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
-import { AddDeviceForm, NewKeyCallout, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
+import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -297,6 +297,7 @@ export default function DeviceList({
               <th className="px-4 py-2 font-normal">Service</th>
               <th className="px-4 py-2 font-normal">Update frequency</th>
               <th className="px-4 py-2 font-normal">Last seen</th>
+              <th className="px-4 py-2 font-normal">Next update</th>
               <th className="px-4 py-2 font-normal">Status</th>
               <th className="w-px px-4 py-2">
                 <span className="sr-only">Actions</span>
@@ -351,6 +352,9 @@ export default function DeviceList({
                     "Never"
                   )}
                 </td>
+                <td className="whitespace-nowrap px-4 py-2.5">
+                  <NextPollCountdown lastSeenAt={d.lastSeenAt} pollSeconds={d.pollSeconds} onDue={() => router.refresh()} />
+                </td>
                 <td className="px-4 py-2.5">
                   {d.lastStatus != null ? <StatusBadge status={d.lastStatus} error={d.lastError} /> : dash}
                 </td>
@@ -394,7 +398,7 @@ export default function DeviceList({
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-[13px] text-muted">
+                <td colSpan={7} className="px-4 py-10 text-center text-[13px] text-muted">
                   No devices match.
                 </td>
               </tr>

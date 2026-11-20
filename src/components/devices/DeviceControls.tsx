@@ -2,7 +2,7 @@
 
 // Device controls shared by the /devices page and a Service's Devices tab.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Copy, FileCode2, Loader2, X } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import { setDevicePollSeconds, setDeviceService, type SubscribableService } from "@/lib/devices/actions";
@@ -90,6 +90,47 @@ export function NewKeyCallout({
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 // Fixed 14px slot beside a dropdown, so the row doesn't shift as the state changes.
+// Live countdown to a device's next poll: last poll + its poll interval. Offline devices (no poll in
+// two intervals plus slack) show "Offline". `onDue` fires once a few seconds after a poll was due, so
+// the caller can reload and pick up the new last-seen time.
+export function NextPollCountdown({
+  lastSeenAt,
+  pollSeconds,
+  onDue,
+}: {
+  lastSeenAt: string | null;
+  pollSeconds: number;
+  onDue?: () => void;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  const firedFor = useRef<number | null>(null);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const last = lastSeenAt ? new Date(lastSeenAt).getTime() : null;
+  const offline = last === null || now - last > (2 * pollSeconds + 15) * 1000;
+  const due = last === null ? 0 : last + pollSeconds * 1000;
+  const left = Math.ceil((due - now) / 1000);
+
+  useEffect(() => {
+    if (offline || left > -3 || !onDue || firedFor.current === due) return;
+    firedFor.current = due;
+    onDue();
+  }, [offline, left, due, onDue]);
+
+  if (last === null) return <span className="text-[#6b6b6b]">Not polled yet</span>;
+  if (offline) return <span className="text-[#6b6b6b]">Offline</span>;
+  if (left <= 0) return <span className="animate-pulse text-[#3ecf8e]">Due now</span>;
+  const m = Math.floor(left / 60);
+  return (
+    <span className="tabular-nums text-[#ededed]" title={`Last polled ${new Date(last).toLocaleTimeString()}`}>
+      {m}:{String(left % 60).padStart(2, "0")}
+    </span>
+  );
+}
+
 function SaveIndicator({ state, error }: { state: SaveState; error?: string | null }) {
   return (
     <span className="inline-flex w-3.5 shrink-0 items-center justify-center" role="status" aria-live="polite">
