@@ -41,6 +41,7 @@ async function latestPolls(supabase: SupabaseClient, devices: DeviceDbRow[]): Pr
   const { data, error } = await supabase
     .from("device_polls")
     .select(LATEST_COLS)
+    .in("device_id", devices.map((d) => d.id)) // only the user's devices, not others' on shared Services
     .order("at", { ascending: false })
     .order("id", { ascending: false })
     .limit(RECENT_POLLS);
@@ -75,7 +76,12 @@ async function pollCounts(
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   const query = () =>
-    supabase.from("device_polls").select("id, device_id", { count: "exact" }).gte("at", fromIso).order("id");
+    supabase
+      .from("device_polls")
+      .select("id, device_id", { count: "exact" })
+      .in("device_id", devices.map((d) => d.id)) // only the user's devices, not others' on shared Services
+      .gte("at", fromIso)
+      .order("id");
 
   const first = await query().range(0, PAGE - 1);
   if (first.error) throw new Error(first.error.message);

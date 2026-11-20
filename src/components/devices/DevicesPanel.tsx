@@ -90,7 +90,8 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
   const [devices, setDevices] = useState<ServiceDeviceRow[] | null>(null);
   const [mine, setMine] = useState<MyDeviceRow[]>([]);
   const [services, setServices] = useState<SubscribableService[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // from the last action
+  const [loadError, setLoadError] = useState<string | null>(null); // from the last (re)load
   const [busy, setBusy] = useState<string | null>(null); // device id, "add" or "move"
   const [adding, setAdding] = useState(false);
   const [shownKey, setShownKey] = useState<{ name: string; key: string } | null>(null);
@@ -108,9 +109,9 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
       setDevices(onService);
       setMine(own);
       setServices(subscribable);
-      setError(null);
+      setLoadError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setLoadError(e instanceof Error ? e.message : String(e));
     }
   }, [serviceId]);
 
@@ -203,7 +204,9 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
         <SetupFilesDialog deviceName={filesFor.name} deviceKey={filesFor.key} onClose={() => setFilesFor(null)} />
       )}
 
-      {error && <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-300">{error}</p>}
+      {(error ?? loadError) && (
+        <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-300">{error ?? loadError}</p>
+      )}
 
       <SubscribeDevice devices={movable} busy={busy === "move"} onMove={(d) => void onMove(d)} />
 

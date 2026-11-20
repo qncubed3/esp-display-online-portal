@@ -49,7 +49,8 @@ const MIN_REDACT_LENGTH = 4; // shorter secret values are too likely to match or
 // ---------- get() with a module-level cache (shared across requests on a warm instance)
 
 interface CacheEntry {
-  expires: number;
+  fetchedAt: number;
+  expires: number; // when the entry may be evicted (fetchedAt + the storing caller's cache seconds)
   text: string;
 }
 const cache = new Map<string, CacheEntry>();
@@ -93,8 +94,10 @@ async function cachedGet(rawUrl: string, cacheSeconds: number): Promise<string> 
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("get: only http(s) URLs are allowed");
   const key = url.toString();
 
+  // Freshness is judged by this caller's cache seconds, so { cache: 0 } always fetches and a short
+  // cache isn't served an entry another caller stored with a longer one.
   const hit = cache.get(key);
-  if (hit && hit.expires > Date.now()) return hit.text;
+  if (hit && cacheSeconds > 0 && Date.now() - hit.fetchedAt < cacheSeconds * 1000) return hit.text;
 
   let pending = inflightFetches.get(key);
   if (!pending) {
@@ -109,7 +112,8 @@ async function cachedGet(rawUrl: string, cacheSeconds: number): Promise<string> 
       for (const [k, v] of cache) if (v.expires <= now) cache.delete(k);
       if (cache.size >= MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value as string);
     }
-    cache.set(key, { expires: Date.now() + cacheSeconds * 1000, text });
+    const now = Date.now();
+    cache.set(key, { fetchedAt: now, expires: now + cacheSeconds * 1000, text });
   }
   return text;
 }

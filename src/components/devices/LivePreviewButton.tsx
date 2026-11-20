@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import DevicePreview from "@/components/draw/DevicePreview";
 import { createClient } from "@/lib/supabase/client";
 import { toWireOps, type DrawRow, type WireOp } from "@/lib/draw/ops";
+import { errorFrameOps, noServiceOps } from "@/lib/draw/screens";
 
 // Keep in sync with the device endpoint.
 const DEFAULT_POLL_S = 30;
@@ -32,39 +33,6 @@ type Screen =
   | { kind: "ok"; name: string; ops: WireOp[] }
   | { kind: "dataError"; name: string; ops: WireOp[]; error: string }
   | { kind: "error"; error: string };
-
-// Same screens as the device endpoint draws.
-function errorFrameOps(message: string): WireOp[] {
-  const msg = message.replace(/\s+/g, " ").trim();
-  const short = msg.length > 50 ? msg.slice(0, 49) + "…" : msg;
-  return [
-    ["fillScreen", "#000000"],
-    ["setTextDatum", "TL"],
-    ["setTextColor", "#FF0000"],
-    ["setTextSize", 2],
-    ["drawString", "DATA ERROR", 8, 8, 1],
-    ["setTextColor", "#FFFFFF"],
-    ["setTextSize", 1],
-    ["drawString", short, 8, 36, 1],
-  ];
-}
-
-function noServiceOps(deviceName: string): WireOp[] {
-  const name = deviceName.replace(/[^ -~]/g, "?").trim();
-  const shortName = name.length > 38 ? name.slice(0, 37) + "~" : name;
-  return [
-    ["fillScreen", "#000000"],
-    ["setTextDatum", "MC"],
-    ["setTextColor", "#FFFF00"],
-    ["setTextSize", 2],
-    ["drawString", "No service assigned", 160, 80, 1],
-    ["setTextSize", 1],
-    ["setTextColor", "#FFFFFF"],
-    ["drawString", "Choose a Service for this device", 160, 122, 2],
-    ["drawString", "in the portal -> Devices", 160, 142, 2],
-    ["drawString", shortName, 160, 180, 2],
-  ];
-}
 
 function ago(seconds: number): string {
   if (seconds < 60) return `${seconds} s ago`;

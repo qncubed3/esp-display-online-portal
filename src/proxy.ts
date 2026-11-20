@@ -8,6 +8,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Skip static assets and the device API (ESP32s authenticate with a device key, not a cookie).
   matcher: [
-    "/((?!api/device|_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!api/device|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

@@ -148,11 +148,14 @@ export function toWireOpsWithRows(rows: DrawRow[], vars: Record<string, unknown>
   const out: WireOp[] = [];
   const rowIds: string[] = [];
   for (const row of rows) {
-    const def = OP_BY_NAME[row.op];
+    // Rows come from the database as-is; skip anything malformed rather than failing the frame.
+    const def = row && typeof row === "object" ? OP_BY_NAME[row.op] : undefined;
     if (!def) continue;
+    const rowArgs: Record<string, unknown> = row.args && typeof row.args === "object" ? row.args : {};
     const args: (string | number)[] = [];
     for (const f of def.fields) {
-      let v = row.args[f.key] ?? f.default;
+      const raw = rowArgs[f.key];
+      let v: string | number = typeof raw === "string" || typeof raw === "number" ? raw : f.default;
       if (typeof v === "string") v = fill(v, vars);
       if (f.optional && v === "") break;
       if (f.type === "int" || (f.type === "select" && typeof f.default === "number")) v = Math.round(Number(v) || 0);
