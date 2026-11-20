@@ -48,7 +48,7 @@ export default function AiChat({ chat }: { chat: AiChatState }) {
         )}
       </div>
 
-      <div ref={listRef} className="max-h-[26rem] min-h-0 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite">
+      <div ref={listRef} className="max-h-[26rem] min-h-0 flex-1 space-y-3 overflow-y-auto xl:max-h-none px-3 py-3" aria-live="polite">
         {entries.length === 0 && (
           <div className="space-y-2.5">
             <p className="text-[12px] text-muted">
@@ -136,7 +136,7 @@ export default function AiChat({ chat }: { chat: AiChatState }) {
           }}
           rows={2}
           maxLength={4000}
-          placeholder="Ask for a change… (Enter to send, Shift+Enter for a new line)"
+          placeholder="Ask for a change…"
           aria-label="Message the AI assistant"
           className="min-h-[52px] min-w-0 flex-1 resize-y rounded-md border border-border bg-panel px-2.5 py-1.5 text-[13px] text-fg outline-none placeholder:text-muted focus:border-accent"
         />

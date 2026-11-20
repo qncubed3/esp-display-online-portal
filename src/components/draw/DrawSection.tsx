@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Braces, ChevronDown, List, LoaderCircle, Plus, Redo2, RefreshCw, Sparkles, Undo2 } from "lucide-react";
 import AiHelperButton from "@/components/ai/AiHelperButton";
 import { buildDrawSkill } from "@/lib/ai/skill";
 import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
-import EditablePreview from "./EditablePreview";
+import EditablePreview, { INLINE_FRAME_HEIGHT } from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
 
@@ -122,7 +122,13 @@ export default function DrawSection(props: {
           </div>
         )}
         {mode === "ai" ? (
-          aiPanel
+          // On xl the chat is exactly as tall as the preview frame beside it.
+          <div
+            className="flex flex-col xl:h-[var(--preview-h)] [&>*]:min-h-0 [&>*]:flex-1"
+            style={{ "--preview-h": `${INLINE_FRAME_HEIGHT}px` } as CSSProperties}
+          >
+            {aiPanel}
+          </div>
         ) : mode === "rows" ? (
           <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
         ) : (
@@ -131,7 +137,7 @@ export default function DrawSection(props: {
         </div>
       </section>
 
-      <aside className="flex w-full min-w-0 shrink-0 flex-col gap-3 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">
+      <aside className="flex w-full min-w-0 shrink-0 flex-col gap-3 xl:sticky xl:top-4 xl:w-auto" aria-label="Preview">
         {/* Same height as the "Draw" header row and the same gap below it, so the preview's top
             lines up with the AI/Rows/JSON switcher. */}
         <div className="flex h-7 items-center justify-end gap-3">

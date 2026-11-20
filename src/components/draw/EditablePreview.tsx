@@ -18,6 +18,11 @@ const THIN_OPS = new Set(["drawLine", "drawFastHLine", "drawFastVLine", "drawPix
 
 type Box = { x: number; y: number; w: number; h: number };
 
+/** Preview scale in the Draw tab (outside full screen). */
+export const INLINE_SCALE = 1.75;
+/** Height of the inline preview's device frame: screen + p-3 padding + 1px borders. */
+export const INLINE_FRAME_HEIGHT = SCREEN_HEIGHT * INLINE_SCALE + 26;
+
 const isFullScreen = (b: Box) => b.x <= 0 && b.y <= 0 && b.x + b.w >= SCREEN_WIDTH && b.y + b.h >= SCREEN_HEIGHT;
 const contains = (b: Box, x: number, y: number, pad = 0) =>
   x >= b.x - pad && x < b.x + b.w + pad && y >= b.y - pad && y < b.y + b.h + pad;
@@ -321,7 +326,7 @@ export default function EditablePreview({
     >
       <DevicePreview
         ops={ops}
-        scale={full ? fullScale : 2}
+        scale={full ? fullScale : INLINE_SCALE}
         overlay={overlay}
         onKeyDown={onKeyDown}
         cursor={cursor || "crosshair"}
