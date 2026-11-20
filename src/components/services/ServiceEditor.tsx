@@ -15,7 +15,7 @@ import NextUpdateCountdown from "@/components/services/NextUpdateCountdown";
 import ActivitySection from "@/components/stats/ActivitySection";
 import LoadTemplateDialog, { type LoadMode } from "@/components/templates/LoadTemplateDialog";
 import { Button } from "@/components/ui/Button";
-import { buildAiSkill } from "@/lib/ai/skill";
+import { buildAiSkill, buildDrawSkill } from "@/lib/ai/skill";
 import type { DrawRow } from "@/lib/draw/ops";
 import type { Template } from "@/lib/templates/catalog";
 
@@ -319,7 +319,23 @@ export default function ServiceEditor({
           varsError={varsError}
           refreshing={refreshing}
           onRefreshData={() => void refreshData()}
-          aiPanel={<AiChat chat={aiChat} />}
+          aiPanel={
+            <AiChat
+              chat={aiChat}
+              headerActions={
+                <AiHelperButton
+                  buildSkill={() => buildDrawSkill(vars)}
+                  title="AI helper: design the screen"
+                  fileName="SKILL.md"
+                  pasteStep={
+                    <>
+                      Paste its <code className="font-mono text-fg">```json</code> block into Draw → JSON.
+                    </>
+                  }
+                />
+              }
+            />
+          }
         />
       )}
 

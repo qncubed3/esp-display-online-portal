@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Minimize2 } from "lucide-react";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type DrawRow, type WireOp } from "@/lib/draw/ops";
 import { applyDrag, canDrag, cursorFor, edgeHandleAt, handlesFor } from "@/lib/draw/geometry";
 import { opBounds } from "@/lib/draw/preview";
@@ -23,6 +23,13 @@ export const INLINE_SCALE = 1.75;
 /** Size of the inline preview's device frame: screen + p-3 padding + 1px borders. */
 export const INLINE_FRAME_WIDTH = SCREEN_WIDTH * INLINE_SCALE + 26;
 export const INLINE_FRAME_HEIGHT = SCREEN_HEIGHT * INLINE_SCALE + 26;
+
+/** What the preview's hint line says for the selected row. */
+export function previewHint(selRow: DrawRow | null): string {
+  if (!selRow) return "Click a shape to select its row";
+  if (canDrag(selRow)) return "Drag to move · grips resize · arrows nudge (Shift ×10)";
+  return selRow.op === "fillScreen" ? "Fill screen covers the whole screen" : "Uses {variables} for its position, so it can't be dragged";
+}
 
 const isFullScreen = (b: Box) => b.x <= 0 && b.y <= 0 && b.x + b.w >= SCREEN_WIDTH && b.y + b.h >= SCREEN_HEIGHT;
 const contains = (b: Box, x: number, y: number, pad = 0) =>
@@ -60,7 +67,8 @@ export default function EditablePreview({
   selectedId,
   onSelect,
   onRowChange,
-  toolbarEnd,
+  full,
+  onFullChange: setFull,
 }: {
   rows: DrawRow[];
   ops: WireOp[];
@@ -69,8 +77,9 @@ export default function EditablePreview({
   selectedId: string | null;
   onSelect(id: string | null): void;
   onRowChange(row: DrawRow): void;
-  /** Extra buttons at the right of the toolbar above the preview (after Full screen). */
-  toolbarEnd?: ReactNode;
+  /** Full-screen editing; controlled so the parent's toolbar can open it. */
+  full: boolean;
+  onFullChange(full: boolean): void;
 }) {
   const rowById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
   const bounds = useMemo(() => opBounds(ops), [ops]);
@@ -78,7 +87,6 @@ export default function EditablePreview({
   const drag = useRef<Drag | null>(null);
   const [dragHandle, setDragHandle] = useState<string | null>(null);
   const [hoverCursor, setHoverCursor] = useState("crosshair");
-  const [full, setFull] = useState(false);
   const [fullScale, setFullScale] = useState(2);
   const [cssWidth, setCssWidth] = useState(0); // canvas width in CSS px, for placing grips
 
@@ -307,13 +315,7 @@ export default function EditablePreview({
       </>
     ) : null;
 
-  const hint = selRow
-    ? movable
-      ? "Drag to move · grips resize · arrows nudge (Shift ×10)"
-      : selRow.op === "fillScreen"
-        ? "Fill screen covers the whole screen"
-        : "Uses {variables} for its position, so it can't be dragged"
-    : "Click a shape to select its row";
+  const hint = previewHint(selRow);
 
   const editor = (
     <div
@@ -339,28 +341,8 @@ export default function EditablePreview({
     </div>
   );
 
-  // Inline, the hint and buttons sit in a toolbar above the preview (outside the pointer handlers).
-  const toolbar = (
-    <div className="mb-3 flex h-7 w-full min-w-0 items-center gap-1.5">
-      <p className="mr-auto min-w-0 truncate text-[12px] text-muted" title={hint}>
-        {hint}
-      </p>
-      <button
-        type="button"
-        onClick={() => setFull(true)}
-        title="Full screen"
-        aria-label="Edit in full screen"
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-hover text-fg outline-none transition-colors hover:border-border-strong hover:bg-[#2a2a2a] focus-visible:ring-1 focus-visible:ring-accent"
-      >
-        <Maximize2 size={14} aria-hidden />
-      </button>
-      {toolbarEnd}
-    </div>
-  );
-
   return (
     <div className="relative flex w-full min-w-0 flex-col items-center">
-      {toolbar}
       {!full && editor}
       {full && (
         <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed border-[#2e2e2e] text-[12px] text-muted">

@@ -1,11 +1,9 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Braces, ChevronDown, List, LoaderCircle, Plus, Redo2, RefreshCw, Sparkles, Undo2 } from "lucide-react";
-import AiHelperButton from "@/components/ai/AiHelperButton";
-import { buildDrawSkill } from "@/lib/ai/skill";
+import { Braces, ChevronDown, List, LoaderCircle, Maximize2, Plus, Redo2, RefreshCw, Sparkles, Undo2 } from "lucide-react";
 import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
-import EditablePreview, { INLINE_FRAME_HEIGHT, INLINE_FRAME_WIDTH } from "./EditablePreview";
+import EditablePreview, { INLINE_FRAME_HEIGHT, INLINE_FRAME_WIDTH, previewHint } from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
 
@@ -71,69 +69,87 @@ export default function DrawSection(props: {
     </div>
   );
 
+  const [full, setFull] = useState(false);
+  const selRow = selectedId ? (rows.find((r) => r.id === selectedId) ?? null) : null;
+  const hint = previewHint(selRow);
+
+  // One grid, two rows on xl: the headers share row 1 and the editor and preview share row 2, so
+  // the chat and the preview always start at the same height (the chat is as tall as the preview).
+  // DOM order is the stacked (mobile) order: header, commands, toolbar, preview.
   return (
-    // On xl the two columns line up: each has a 28px header row and a 12px gap, then the chat
-    // (or rows/JSON) on the left and the preview on the right, the chat as tall as the preview.
     <div
-      className="flex flex-col gap-6 min-w-0 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5 xl:flex-row xl:items-start"
+      className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-3 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5 xl:grid-cols-[minmax(0,1fr)_var(--preview-w)]"
       style={{ "--preview-w": `${INLINE_FRAME_WIDTH}px`, "--preview-h": `${INLINE_FRAME_HEIGHT}px` } as CSSProperties}
     >
-      <section className="min-w-0 flex-1" aria-label="Draw commands">
-        <div className={`flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 xl:mb-3 ${collapsed ? "" : "mb-3"}`}>
-          <h2 className="mr-auto min-w-0 text-[14px] font-medium">
-            <button
-              type="button"
-              onClick={() => setCollapsed((c) => !c)}
-              aria-expanded={!collapsed}
-              aria-controls="draw-commands-body"
-              className="-mx-1 inline-flex min-w-0 items-baseline gap-3 rounded px-1 outline-none focus-visible:ring-1 focus-visible:ring-accent xl:pointer-events-none"
-            >
-              <ChevronDown
-                size={14}
-                aria-hidden
-                className={`shrink-0 self-center text-muted transition-transform xl:hidden ${collapsed ? "-rotate-90" : ""}`}
-              />
-              Draw
-              <span className="truncate font-normal text-muted">
-                {rows.length} {rows.length === 1 ? "command" : "commands"}
-              </span>
-            </button>
-          </h2>
-          <div className={`items-center gap-2 ${collapsed ? "hidden xl:flex" : "flex"}`}>
-            {switcher}
-            <AiHelperButton
-              buildSkill={() => buildDrawSkill(vars)}
-              title="AI helper: design the screen"
-              fileName="SKILL.md"
-              pasteStep={
-                <>
-                  Paste its <code className="font-mono text-fg">```json</code> block into Draw → JSON.
-                </>
-              }
+      <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-x-3 gap-y-2 xl:col-start-1 xl:row-start-1">
+        <h2 className="min-w-0 text-[14px] font-medium">
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            aria-controls="draw-commands-body"
+            className="-mx-1 inline-flex min-w-0 items-baseline gap-3 rounded px-1 outline-none focus-visible:ring-1 focus-visible:ring-accent xl:pointer-events-none"
+          >
+            <ChevronDown
+              size={14}
+              aria-hidden
+              className={`shrink-0 self-center text-muted transition-transform xl:hidden ${collapsed ? "-rotate-90" : ""}`}
             />
+            Draw
+            <span className="truncate font-normal text-muted">
+              {rows.length} {rows.length === 1 ? "command" : "commands"}
+            </span>
+          </button>
+        </h2>
+        <div className={collapsed ? "hidden xl:flex" : "flex"}>{switcher}</div>
+      </div>
+
+      <section
+        id="draw-commands-body"
+        aria-label="Draw commands"
+        className={`min-w-0 xl:col-start-1 xl:row-start-2 ${collapsed ? "hidden xl:block" : ""}`}
+      >
+        {mode === "rows" && (
+          <div className="mb-3 flex items-center gap-2">
+            <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="min-w-0 flex-1" />
+            <button type="button" onClick={add} className={`${btnCls} shrink-0`}>
+              <Plus size={14} className="text-accent" aria-hidden /> Add row
+            </button>
           </div>
-        </div>
-        <div id="draw-commands-body" className={collapsed ? "hidden xl:block" : ""}>
-          {mode === "rows" && (
-            <div className="mb-3 flex items-center gap-2">
-              <OpSelect label="New row type" value={addOp} onChange={setAddOp} className="min-w-0 flex-1" />
-              <button type="button" onClick={add} className={`${btnCls} shrink-0`}>
-                <Plus size={14} className="text-accent" aria-hidden /> Add row
-              </button>
-            </div>
-          )}
-          {mode === "ai" ? (
-            <div className="flex flex-col xl:h-[var(--preview-h)] [&>*]:min-h-0 [&>*]:flex-1">{aiPanel}</div>
-          ) : mode === "rows" ? (
-            <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
-          ) : (
-            <DrawJsonEditor rows={rows} onChange={onChange} />
-          )}
-        </div>
+        )}
+        {mode === "ai" ? (
+          <div className="flex flex-col xl:h-[var(--preview-h)] [&>*]:min-h-0 [&>*]:flex-1">{aiPanel}</div>
+        ) : mode === "rows" ? (
+          <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
+        ) : (
+          <DrawJsonEditor rows={rows} onChange={onChange} />
+        )}
       </section>
 
-      {/* Exactly the preview frame's width on xl, so the toolbar's right edge meets the preview's. */}
-      <aside className="flex w-full min-w-0 shrink-0 flex-col items-center xl:sticky xl:top-4 xl:w-[var(--preview-w)]" aria-label="Preview">
+      <div className="mt-3 flex h-7 min-w-0 items-center gap-1.5 xl:col-start-2 xl:row-start-1 xl:mt-0">
+        <p className="mr-auto min-w-0 truncate text-[12px] text-muted" title={hint}>
+          {hint}
+        </p>
+        <button type="button" onClick={() => setFull(true)} title="Full screen" aria-label="Edit in full screen" className={iconBtnCls}>
+          <Maximize2 size={14} aria-hidden />
+        </button>
+        <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" className={iconBtnCls}>
+          <Undo2 size={14} aria-hidden />
+        </button>
+        <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className={iconBtnCls}>
+          <Redo2 size={14} aria-hidden />
+        </button>
+        <button type="button" onClick={onRefreshData} disabled={refreshing} className={btnCls}>
+          {refreshing ? (
+            <LoaderCircle size={14} className="animate-spin text-muted" aria-hidden />
+          ) : (
+            <RefreshCw size={14} className="text-muted" aria-hidden />
+          )}
+          {refreshing ? "Running…" : "Refresh data"}
+        </button>
+      </div>
+
+      <aside className="flex min-w-0 flex-col items-center xl:sticky xl:top-4 xl:col-start-2 xl:row-start-2 xl:self-start" aria-label="Preview">
         <EditablePreview
           rows={rows}
           ops={ops}
@@ -141,24 +157,8 @@ export default function DrawSection(props: {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onRowChange={(row) => onChange(rows.map((r) => (r.id === row.id ? row : r)))}
-          toolbarEnd={
-            <>
-              <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo" className={iconBtnCls}>
-                <Undo2 size={14} aria-hidden />
-              </button>
-              <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className={iconBtnCls}>
-                <Redo2 size={14} aria-hidden />
-              </button>
-              <button type="button" onClick={onRefreshData} disabled={refreshing} className={btnCls}>
-                {refreshing ? (
-                  <LoaderCircle size={14} className="animate-spin text-muted" aria-hidden />
-                ) : (
-                  <RefreshCw size={14} className="text-muted" aria-hidden />
-                )}
-                {refreshing ? "Running…" : "Refresh data"}
-              </button>
-            </>
-          }
+          full={full}
+          onFullChange={setFull}
         />
         {varsError && (
           <p className="mt-1 max-w-full truncate text-[12px] text-red-300" title={varsError}>

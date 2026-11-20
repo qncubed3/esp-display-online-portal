@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, ArrowUp, Code2, Loader2, Shapes, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import type { AiChatState } from "./useAiChat";
@@ -13,7 +13,7 @@ const SUGGESTIONS = [
 
 // The AI assistant: the "AI" view of the Draw commands panel. Replies are applied to the editor straight away
 // (unsaved until Save & deploy); the latest change can be undone.
-export default function AiChat({ chat }: { chat: AiChatState }) {
+export default function AiChat({ chat, headerActions }: { chat: AiChatState; /** Extra buttons in the header row. */ headerActions?: ReactNode }) {
   const { entries, pending, send, undo, clear } = chat;
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -36,16 +36,19 @@ export default function AiChat({ chat }: { chat: AiChatState }) {
         <h3 className="inline-flex items-center gap-1.5 text-[13px] font-medium">
           <Sparkles size={14} className="text-accent" aria-hidden /> AI assistant
         </h3>
-        {entries.length > 0 && (
-          <button
-            type="button"
-            onClick={clear}
-            disabled={pending}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-muted outline-none transition-colors hover:text-fg focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-50"
-          >
-            <Trash2 size={12} aria-hidden /> Clear
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {entries.length > 0 && (
+            <button
+              type="button"
+              onClick={clear}
+              disabled={pending}
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-muted outline-none transition-colors hover:text-fg focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-50"
+            >
+              <Trash2 size={12} aria-hidden /> Clear
+            </button>
+          )}
+          {headerActions}
+        </div>
       </div>
 
       <div ref={listRef} className="max-h-[26rem] min-h-0 flex-1 space-y-3 overflow-y-auto xl:max-h-none px-3 py-3" aria-live="polite">
