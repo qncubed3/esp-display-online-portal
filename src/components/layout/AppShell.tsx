@@ -22,7 +22,7 @@ export default function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-panel">
         <Link href="/" className="flex h-12 items-center gap-2 border-b border-border px-4">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/15 text-accent">
@@ -78,7 +78,10 @@ export default function AppShell({
             <NotificationBell />
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-auto">{children}</main>
+        {/* The only scroll container on signed-in pages. `relative` makes it the containing block for
+            absolutely positioned descendants without a closer positioned ancestor (e.g. `sr-only` spans);
+            otherwise they resolve against the viewport and stretch the document, adding a second scrollbar. */}
+        <main className="relative min-h-0 flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );
