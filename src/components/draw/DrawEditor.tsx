@@ -609,7 +609,7 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
             </div>
 
             {lines.length > 0 && (
-              <div className="mt-2 grid grid-cols-[64px_84px_84px_minmax(84px,1fr)] items-center gap-x-2 gap-y-1.5">
+              <div className="mt-2 grid grid-cols-[48px_minmax(0,84px)_minmax(0,84px)_minmax(0,1fr)] items-center sm:grid-cols-[64px_84px_84px_minmax(84px,1fr)] gap-x-2 gap-y-1.5">
                 {lines.map((line) => (
                   <Fragment key={line.label}>
                     <span className="truncate text-[11px] text-[#a0a0a0]">{line.label}</span>

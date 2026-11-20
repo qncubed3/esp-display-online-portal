@@ -167,9 +167,9 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
   const movable = mine.filter((d) => d.service_id !== serviceId);
 
   return (
-    <section className="space-y-3 text-[13px] text-[#ededed]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+    <section className="min-w-0 space-y-3 text-[13px] text-[#ededed]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-[14px] font-medium">Devices</h2>
           <p className="text-[#a0a0a0]">
             ESP32 screens subscribed to this service.{" "}

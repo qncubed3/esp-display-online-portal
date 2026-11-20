@@ -326,7 +326,7 @@ export default function EditablePreview({
         onKeyDown={onKeyDown}
         cursor={cursor || "crosshair"}
       />
-      <div className="mt-1 flex items-center justify-center gap-2" style={{ cursor: "default" }}>
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-2" style={{ cursor: "default" }}>
         <p className={`text-center text-[12px] ${full ? "text-[#a0a0a0]" : "text-muted"}`}>{hint}</p>
         {!full && (
           <button
@@ -358,7 +358,7 @@ export default function EditablePreview({
             role="dialog"
             aria-modal="true"
             aria-label="Full-screen preview editor"
-            className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-6 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4 backdrop-blur-sm sm:p-6"
           >
             <div className="flex h-14 shrink-0 items-start justify-between">
               <span className="text-[13px] text-[#a0a0a0]">Full-screen editor · Esc to close</span>

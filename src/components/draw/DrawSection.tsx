@@ -40,7 +40,7 @@ export default function DrawSection(props: {
   };
 
   return (
-    <div className="flex flex-col gap-6 rounded-md border border-border bg-panel p-5 text-[13px] text-fg xl:flex-row xl:items-start">
+    <div className="flex flex-col gap-6 min-w-0 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5 xl:flex-row xl:items-start">
       <section className="min-w-0 flex-1" aria-label="Draw commands">
         <div className="mb-3 flex items-baseline gap-3">
           <h2 className="text-[14px] font-medium">Draw</h2>
@@ -95,8 +95,8 @@ export default function DrawSection(props: {
         )}
       </section>
 
-      <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">
-        <div className="flex flex-col items-center">
+      <aside className="flex w-full min-w-0 shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:w-[680px]" aria-label="Preview">
+        <div className="flex min-w-0 flex-col items-center">
           <EditablePreview
             rows={rows}
             ops={ops}

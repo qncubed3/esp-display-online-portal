@@ -27,13 +27,13 @@ type Tab = (typeof TABS)[number]["id"];
 const isTab = (v: string): v is Tab => TABS.some((t) => t.id === v);
 
 function Section({ children }: { children: ReactNode }) {
-  return <section className="rounded-md border border-border bg-panel p-5">{children}</section>;
+  return <section className="min-w-0 rounded-md border border-border bg-panel p-4 md:p-5">{children}</section>;
 }
 
 function SectionTitle({ title, hint, actions }: { title: string; hint?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
-      <div>
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
         <h2 className="text-[14px] font-medium text-fg">{title}</h2>
         {hint && <p className="text-[13px] text-muted">{hint}</p>}
       </div>
@@ -171,7 +171,7 @@ export default function ServiceEditor({
 
   return (
     // Fills the page height so the Save & deploy bar sits at the bottom even on short tabs.
-    <div className="mt-6 flex flex-1 flex-col gap-5">
+    <div className="mt-6 flex min-w-0 flex-1 flex-col gap-5">
       <div role="tablist" aria-label="Service sections" className="-mb-1 flex gap-1 border-b border-border">
         {TABS.map(({ id, label, icon: Icon }) => {
           const active = tab === id;
@@ -183,7 +183,7 @@ export default function ServiceEditor({
               role="tab"
               aria-selected={active}
               onClick={() => openTab(id)}
-              className={`-mb-px inline-flex h-9 items-center gap-2 border-b-2 px-3 text-[13px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
+              className={`-mb-px inline-flex h-9 shrink-0 items-center gap-2 border-b-2 px-2.5 text-[13px] sm:px-3 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent ${
                 active ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"
               }`}
             >
@@ -193,10 +193,16 @@ export default function ServiceEditor({
             </button>
           );
         })}
-        <div className="ml-auto flex items-center pb-1">
-          <Button size="sm" variant="ghost" onClick={() => setTemplateOpen(true)} title="Load a template into this Service">
+        <div className="ml-auto flex shrink-0 items-center pb-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setTemplateOpen(true)}
+            title="Load a template into this Service"
+            aria-label="Load template"
+          >
             <LayoutTemplate size={14} />
-            Load template
+            <span className="hidden sm:inline">Load template</span>
           </Button>
         </div>
       </div>
@@ -266,9 +272,9 @@ export default function ServiceEditor({
         />
       )}
 
-      <div className="sticky bottom-0 z-10 -mx-6 mt-auto border-t border-border bg-bg/95 px-6 py-3 backdrop-blur">
-        <div className="flex items-center justify-end gap-3">
-          <div className="mr-auto">
+      <div className="sticky bottom-0 z-10 -mx-4 mt-auto border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <div className="mr-auto min-w-0">
             <NextUpdateCountdown serviceId={serviceId} />
           </div>
           {saveError ? (

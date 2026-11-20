@@ -76,15 +76,15 @@ export default function ServiceHeader({
   return (
     <div className="mb-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 max-w-full items-center gap-3">
           {editing ? (
-            <form onSubmit={saveName} className="flex items-center gap-1.5">
+            <form onSubmit={saveName} className="flex min-w-0 items-center gap-1.5">
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 autoFocus
                 maxLength={100}
-                className="h-8 w-72 text-base"
+                className="h-8 w-72 min-w-0 max-w-full text-base"
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setEditing(false);
@@ -125,7 +125,7 @@ export default function ServiceHeader({
           {!isOwner && <Badge className="shrink-0">Shared with you</Badge>}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Toggle checked={isEnabled} onChange={toggle} disabled={pending} label="Enabled" />
           <ShareButton serviceId={serviceId} isOwner={isOwner} />
           {isOwner ? (

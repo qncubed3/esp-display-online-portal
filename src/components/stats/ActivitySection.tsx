@@ -178,8 +178,8 @@ export default function ActivitySection({ serviceId }: { serviceId: string }) {
   const shown = data; // the previous range stays on screen while a new one loads
 
   return (
-    <section className="rounded-md border border-border bg-panel p-5 text-[13px] text-fg">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section className="min-w-0 rounded-md border border-border bg-panel p-4 text-[13px] text-fg md:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-[14px] font-medium text-fg">
             Activity
@@ -216,7 +216,7 @@ function Skeleton() {
           <div key={i} className="h-[62px] animate-pulse rounded-md border border-border bg-bg/60" />
         ))}
       </div>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="h-[186px] animate-pulse rounded-md border border-border bg-bg/60" />
         <div className="h-[186px] animate-pulse rounded-md border border-border bg-bg/60" />
       </div>
@@ -273,7 +273,7 @@ function ActivityBody({ data }: { data: ServiceActivity }) {
           No polls in the {RANGE_LABEL[data.range]}.
         </p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <ChartCard
             title="Polls"
             legend={

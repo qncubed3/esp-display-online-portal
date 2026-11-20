@@ -16,7 +16,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 export default function Loading() {
   return (
     <AppShell crumbs={[{ label: "My Services", href: "/" }, { label: "…" }]}>
-      <div role="status" aria-label="Loading" className="mx-auto max-w-6xl px-6 pt-6">
+      <div role="status" aria-label="Loading" className="mx-auto max-w-6xl px-4 md:px-6 pt-6">
         <div className="flex items-center justify-between gap-4">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-7 w-40 rounded-md" />
