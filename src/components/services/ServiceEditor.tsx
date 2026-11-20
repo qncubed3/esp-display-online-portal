@@ -7,6 +7,7 @@ import DataEditor from "@/components/data/DataEditor";
 import VariablesPanel from "@/components/data/VariablesPanel";
 import DevicesPanel from "@/components/devices/DevicesPanel";
 import DrawSection from "@/components/draw/DrawSection";
+import ActivitySection from "@/components/stats/ActivitySection";
 import { Button } from "@/components/ui/Button";
 import type { DrawRow } from "@/lib/draw/ops";
 
@@ -120,6 +121,8 @@ export default function ServiceEditor({
       <Section>
         <DevicesPanel serviceId={serviceId} />
       </Section>
+
+      <ActivitySection serviceId={serviceId} />
 
       <Section>
         <SectionTitle
