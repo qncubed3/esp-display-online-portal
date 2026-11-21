@@ -2,12 +2,13 @@
 
 import { useMemo } from "react";
 import DevicePreview from "@/components/draw/DevicePreview";
+import PreviewPlaceholder from "@/components/draw/PreviewPlaceholder";
 import LazyMount from "@/components/templates/LazyMount";
 import LoadIntoServiceButton from "@/components/templates/LoadIntoServiceButton";
 import { groupByCategory, TemplateFilterBar, useTemplateFilter } from "@/components/templates/TemplateFilters";
 import UseTemplateButton from "@/components/templates/UseTemplateButton";
 import { Badge } from "@/components/ui/Badge";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, toWireOps } from "@/lib/draw/ops";
+import { toWireOps } from "@/lib/draw/ops";
 import { TEMPLATES, type Template } from "@/lib/templates/catalog";
 
 function Preview({ t }: { t: Template }) {
@@ -15,18 +16,7 @@ function Preview({ t }: { t: Template }) {
   return <DevicePreview ops={ops} scale={1} />;
 }
 
-// Same footprint as DevicePreview at scale 1 (bezel, screen, coordinates line).
-const PREVIEW_PLACEHOLDER = (
-  <div className="inline-flex max-w-full flex-col items-center gap-2">
-    <div className="max-w-full rounded-xl border border-[#2e2e2e] bg-[#111] p-3">
-      <div
-        className="max-w-full bg-black"
-        style={{ width: SCREEN_WIDTH, aspectRatio: `${SCREEN_WIDTH} / ${SCREEN_HEIGHT}` }}
-      />
-    </div>
-    <div className="h-4" />
-  </div>
-);
+const PREVIEW_PLACEHOLDER = <PreviewPlaceholder />;
 
 function TemplateCard({ t }: { t: Template }) {
   return (
