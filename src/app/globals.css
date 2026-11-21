@@ -42,9 +42,9 @@ body {
   animation: skeleton-sweep 1.4s linear infinite;
 }
 
-/* Loading screen preview: the same sweep on the near-black screen, in darker greys. */
+/* Loading screen preview: the same sweep on the screen area, dark enough to still read as a screen. */
 .skeleton-screen {
-  background: linear-gradient(90deg, #050505 0%, #050505 35%, #1a1a1a 50%, #050505 65%, #050505 100%);
+  background: linear-gradient(90deg, #161616 0%, #161616 30%, #2c2c2c 50%, #161616 70%, #161616 100%);
   background-size: 200% 100%;
   animation: skeleton-sweep 1.4s linear infinite;
 }
