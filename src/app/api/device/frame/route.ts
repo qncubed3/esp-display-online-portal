@@ -4,6 +4,9 @@
 //   GET /api/device/frame?since=<id> 304 when the frame hasn't changed
 //
 // Responses: 200 Frame JSON | 304 unchanged | 204 service disabled | 401 bad key.
+// Frame schema: v2 when the device sends X-Frame-Version: 2 (firmware 2.0+), otherwise v1, with
+// anything v1 can't draw degraded (see src/lib/draw/frame.ts). A 200 says what was degraded, if
+// anything, in X-Frame-Degraded (feature names from src/lib/draw/capabilities.ts).
 // A device with no Service (or one its owner can no longer access) gets a 200 "No service assigned"
 // frame, so it can be subscribed to a Service from the portal later without reflashing.
 // Every response that the device should act on carries X-Next-Poll (seconds), and every reply
@@ -15,12 +18,13 @@
 // Note: with `cacheComponents` enabled the `dynamic` segment option is not allowed;
 // this handler reads the request, so it always runs at request time.
 
-import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashKey } from "@/lib/devices/keys";
 import { runDataCode } from "@/lib/data/run";
 import { loadOwnerRunOptions } from "@/lib/secrets/load";
-import { toWireOps, type DrawRow, type Frame, type WireOp } from "@/lib/draw/ops";
+import { toWireOps, type DrawRow, type WireOp } from "@/lib/draw/ops";
+import { featuresNeeded, missingFeatures } from "@/lib/draw/capabilities";
+import { buildFrame, requestedFrameVersion } from "@/lib/draw/frame";
 import { errorFrameOps, noServiceOps } from "@/lib/draw/screens";
 import { readDeviceInfo, recordPoll } from "@/lib/polls/log";
 
@@ -40,6 +44,7 @@ interface DeviceWithService {
   name: string;
   owner_id?: string; // added by migration 007
   poll_seconds?: number | null;
+  rotation?: number | null; // added by migration 011
   service: {
     id: string;
     owner_id: string;
@@ -87,7 +92,7 @@ export async function GET(request: Request) {
   let service: Service | null = null;
   try {
     service = await accessibleService(supabase, device);
-    served = await serve(supabase, device, service, url);
+    served = await serve(supabase, device, service, url, requestedFrameVersion(request.headers.get("x-frame-version")));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[device/frame] failed", message);
@@ -145,6 +150,7 @@ async function serve(
   device: DeviceWithService,
   service: Service | null,
   url: URL,
+  version: 1 | 2,
 ): Promise<Served> {
   // Awaited so it completes before the serverless function is frozen.
   const { error: seenError } = await supabase
@@ -186,23 +192,26 @@ async function serve(
       : toWireOps(Array.isArray(service.draw_ops) ? service.draw_ops : [], result.vars);
   }
 
-  const id = createHash("sha256").update(JSON.stringify(ops)).digest("hex").slice(0, 12);
+  const frame = buildFrame(ops, { version, rotation: device.rotation, poll: pollInterval });
   const headers = {
     ...noStore,
     "X-Next-Poll": String(pollInterval),
     "X-Poll-Interval": String(pollInterval),
-    ETag: `"${id}"`,
+    ETag: `"${frame.id}"`,
   };
-  const base = { ops: ops.length, dataMs, error: dataError ?? null };
+  const base = { ops: frame.ops.length, dataMs, error: dataError ?? null };
 
-  if (url.searchParams.get("since") === id) {
+  if (url.searchParams.get("since") === frame.id) {
     return { response: new Response(null, { status: 304, headers }), status: 304, bytes: 0, ...base };
   }
 
-  const frame: Frame = { v: 1, id, next: pollInterval, poll: pollInterval, ops };
+  const degraded = missingFeatures(featuresNeeded({ rotation: device.rotation, ops }), version);
   const body = JSON.stringify(frame);
   return {
-    response: new Response(body, { status: 200, headers: { ...headers, "Content-Type": "application/json" } }),
+    response: new Response(body, {
+      status: 200,
+      headers: { ...headers, "Content-Type": "application/json", ...(degraded.length ? { "X-Frame-Degraded": degraded.join(",") } : {}) },
+    }),
     status: 200,
     bytes: Buffer.byteLength(body),
     ...base,

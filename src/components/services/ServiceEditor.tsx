@@ -314,6 +314,7 @@ export default function ServiceEditor({
 
       {tab === "draw" && (
         <DrawSection
+          serviceId={serviceId}
           rows={rows}
           onChange={(next) => setRows(next)}
           history={{ undo: undoRows, redo: redoRows, canUndo: rowsHistory.canUndo, canRedo: rowsHistory.canRedo }}

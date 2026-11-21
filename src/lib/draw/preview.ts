@@ -5,6 +5,7 @@
 
 import { FONT2, FONT4, GLCD } from "./fonts";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type WireOp } from "./ops";
+import { TEXT_ROT_OP, normalizeAngle } from "./rotate";
 
 type Datum = "TL" | "TC" | "TR" | "ML" | "MC" | "MR" | "BL" | "BC" | "BR";
 
@@ -117,6 +118,47 @@ const int = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// A string's unrotated box at the current text size and datum, like TFT_eSPI places it.
+function textBox(str: string, x: number, y: number, fontId: number, size: number, datum: Datum) {
+  const w = textWidth(str, fontId) * size, h = fontHeight(fontId) * size;
+  const di = Math.max(0, DATUMS.indexOf(datum));
+  const col = di % 3, row = Math.floor(di / 3);
+  return { w, h, left: x - (col === 1 ? Math.floor(w / 2) : col === 2 ? w : 0), top: y - (row === 1 ? Math.floor(h / 2) : row === 2 ? h : 0) };
+}
+
+// Rotated text, like the firmware's sprite pushRotated: the text's box turns `deg` clockwise about
+// its centre; each screen pixel takes the nearest source pixel (no anti-aliasing). `plot(x, y, ink)`
+// is called for every covered pixel (ink false = background).
+function eachRotatedPixel(
+  w: number, h: number, left: number, top: number, deg: number,
+  inkAt: (sx: number, sy: number) => boolean,
+  plot: (x: number, y: number, ink: boolean) => void,
+) {
+  const px = Math.floor(w / 2), py = Math.floor(h / 2); // pivot inside the box, as on the device
+  const cx = left + px, cy = top + py;
+  const rad = (deg * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad);
+  const corners = [[-px, -py], [w - px, -py], [w - px, h - py], [-px, h - py]].map(([dx, dy]) => [dx * c - dy * s, dx * s + dy * c]);
+  const xs = corners.map((p) => p[0]), ys = corners.map((p) => p[1]);
+  for (let dy = Math.floor(Math.min(...ys)); dy <= Math.ceil(Math.max(...ys)); dy++) {
+    for (let dx = Math.floor(Math.min(...xs)); dx <= Math.ceil(Math.max(...xs)); dx++) {
+      // Inverse rotation of the pixel centre back into the text box.
+      const sx = Math.floor((dx + 0.5) * c + (dy + 0.5) * s) + px;
+      const sy = Math.floor(-(dx + 0.5) * s + (dy + 0.5) * c) + py;
+      if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+      plot(cx + dx, cy + dy, inkAt(sx, sy));
+    }
+  }
+}
+
+// Screen box covered by text turned `deg` about its centre.
+function rotatedTextBounds(w: number, h: number, left: number, top: number, deg: number): Box {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  eachRotatedPixel(w, h, left, top, deg, () => true, (x, y) => {
+    minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+  });
+  return minX === Infinity ? { x: left, y: top, w, h } : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
 
 export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): void {
   ctx.imageSmoothingEnabled = false;
@@ -213,14 +255,8 @@ export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): voi
   const drawString = (str: string, x: number, y: number, fontId: number) => {
     if (!str) return;
     const size = Math.max(1, text.size);
-    const w = textWidth(str, fontId) * size, h = fontHeight(fontId) * size;
+    const { w, h, left, top } = textBox(str, x, y, fontId, size, text.datum);
     if (w <= 0) return;
-
-    // Datum → top-left.
-    const di = Math.max(0, DATUMS.indexOf(text.datum));
-    const col = di % 3, row = Math.floor(di / 3);
-    const left = x - (col === 1 ? Math.floor(w / 2) : col === 2 ? w : 0);
-    const top = y - (row === 1 ? Math.floor(h / 2) : row === 2 ? h : 0);
 
     if (text.bg) {
       ctx.fillStyle = text.bg;
@@ -228,6 +264,24 @@ export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): voi
     }
     ctx.fillStyle = text.fg;
     eachInkPixel(str, fontId, (px, py) => ctx.fillRect(left + px * size, top + py * size, size, size));
+    ctx.fillStyle = color;
+  };
+
+  const drawStringRot = (str: string, x: number, y: number, fontId: number, deg: number) => {
+    if (deg === 0) return drawString(str, x, y, fontId);
+    if (!str) return;
+    const size = Math.max(1, text.size);
+    const { w, h, left, top } = textBox(str, x, y, fontId, size, text.datum);
+    if (w <= 0) return;
+    const mask = new Uint8Array(w * h);
+    eachInkPixel(str, fontId, (px, py) => {
+      for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) mask[(py * size + j) * w + px * size + i] = 1;
+    });
+    eachRotatedPixel(w, h, left, top, deg, (sx, sy) => mask[sy * w + sx] === 1, (px, py, ink) => {
+      if (!ink && !text.bg) return;
+      ctx.fillStyle = ink ? text.fg : text.bg!;
+      ctx.fillRect(px, py, 1, 1);
+    });
     ctx.fillStyle = color;
   };
 
@@ -335,6 +389,9 @@ export function renderPreview(ctx: CanvasRenderingContext2D, ops: WireOp[]): voi
       case "drawString":
         drawString(String(a[0] ?? ""), int(a[1]), int(a[2]), a.length > 3 ? int(a[3]) : 1);
         break;
+      case TEXT_ROT_OP:
+        drawStringRot(String(a[0] ?? ""), int(a[1]), int(a[2]), a.length > 3 ? int(a[3]) : 1, normalizeAngle(a[4]));
+        break;
       default:
         break; // unknown ops are skipped, like the firmware
     }
@@ -395,15 +452,14 @@ export function opBounds(ops: WireOp[]): (Box | null)[] {
         else if (typeof v === "string" && (DATUMS as string[]).includes(v.toUpperCase())) text.datum = v.toUpperCase() as Datum;
         return null;
       }
-      case "drawString": {
+      case "drawString":
+      case TEXT_ROT_OP: {
         const str = String(a[0] ?? "");
         const fontId = a.length > 3 ? int(a[3]) : 1;
-        const w = textWidth(str, fontId) * text.size, h = fontHeight(fontId) * text.size;
-        const di = Math.max(0, DATUMS.indexOf(text.datum));
-        const col = di % 3, row = Math.floor(di / 3);
-        const x = int(a[1]) - (col === 1 ? Math.floor(w / 2) : col === 2 ? w : 0);
-        const y = int(a[2]) - (row === 1 ? Math.floor(h / 2) : row === 2 ? h : 0);
-        return box(x, y, w, h);
+        const { w, h, left, top } = textBox(str, int(a[1]), int(a[2]), fontId, text.size, text.datum);
+        const deg = name === TEXT_ROT_OP ? normalizeAngle(a[4]) : 0;
+        if (deg && w > 0 && h > 0) return rotatedTextBounds(w, h, left, top, deg);
+        return box(left, top, w, h);
       }
       default:
         return null;

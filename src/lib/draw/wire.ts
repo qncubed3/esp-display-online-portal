@@ -4,15 +4,16 @@
 // order) but with `{var}` placeholders left in. The Draw section's JSON editor shows and
 // accepts this form, so pasted AI output and hand edits map straight onto rows.
 
-import { OP_BY_NAME, type DrawRow, type Field } from "./ops";
+import { OP_BY_NAME, isEmptyArg, type DrawRow, type Field } from "./ops";
 
 export type RawWireOp = [string, ...(string | number)[]];
 
 const hasVar = (v: string) => /\{\w+\}/.test(v);
 const isNumericField = (f: Field) => f.type === "int" || (f.type === "select" && typeof f.default === "number");
 
-// Rows → wire form. Mirrors toWireOps without fill(): optional trailing args that are empty are
-// left off, numeric fields become numbers unless they hold a {var} placeholder.
+// Rows → wire form. Mirrors toWireOps without fill(): optional trailing args that are empty (or at
+// their default, e.g. rotation 0) are left off, numeric fields become numbers unless they hold a
+// {var} placeholder. The rotation stays a trailing arg here (toWireOps expands it for the device).
 export function rowsToWire(rows: DrawRow[]): RawWireOp[] {
   const out: RawWireOp[] = [];
   for (const row of rows) {
@@ -21,10 +22,10 @@ export function rowsToWire(rows: DrawRow[]): RawWireOp[] {
     const args: (string | number)[] = [];
     for (const f of def.fields) {
       let v = row.args[f.key] ?? f.default;
-      if (f.optional && v === "") break;
-      if (isNumericField(f) && !(typeof v === "string" && hasVar(v))) v = Math.round(Number(v)) || 0;
+      if (isNumericField(f) && !(typeof v === "string" && hasVar(v)) && !(f.optional && v === "")) v = Math.round(Number(v)) || 0;
       args.push(v);
     }
+    while (args.length && isEmptyArg(def.fields[args.length - 1], args[args.length - 1])) args.pop();
     out.push([def.op, ...args]);
   }
   return out;

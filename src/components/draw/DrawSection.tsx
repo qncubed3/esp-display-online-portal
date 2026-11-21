@@ -1,11 +1,23 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Braces, ChevronDown, List, LoaderCircle, Maximize2, Plus, Redo2, RefreshCw, Sparkles, Undo2 } from "lucide-react";
 import { newRow, toWireOpsWithRows, type DrawRow } from "@/lib/draw/ops";
 import EditablePreview, { INLINE_FRAME_HEIGHT, INLINE_FRAME_WIDTH, previewHint } from "./EditablePreview";
 import DrawJsonEditor from "./DrawJsonEditor";
 import DrawEditor, { OpSelect } from "./DrawEditor";
+import { useList } from "@/lib/store/cache";
+import { deviceFrameVersion } from "@/lib/firmware/version";
+
+// Presses here never clear the selection: the preview editor handles its own, the commands panel
+// is where rows are selected and edited, and other dialogs or popovers opened from the editor
+// (pickers, menus) aren't "outside". The full-screen editor is a dialog too, but its dark backdrop
+// counts as outside (see below).
+const KEEP_SELECTION = "[data-preview], [data-draw-keep], [role=dialog], [role=listbox], [role=menu]";
+const FULL_SCREEN = "[data-full-editor]";
+
+const isTyping = (el: Element | null) =>
+  !!el && (el.matches("input, textarea, select, [contenteditable=''], [contenteditable=true]") || !!el.closest("[contenteditable=true]"));
 
 const iconBtnCls =
   "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-hover text-fg outline-none transition-colors hover:border-border-strong hover:bg-[#2a2a2a] focus-visible:ring-1 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-panel-hover";
@@ -16,6 +28,8 @@ const btnCls =
 // The Draw part of the service page. Stateless about persistence: the parent owns rows, the
 // Data section's variables and saving; this renders the editor and a live preview.
 export default function DrawSection(props: {
+  /** For the note on fields that older firmware can't draw (counted from the cached device list). */
+  serviceId?: string;
   rows: DrawRow[];
   onChange(rows: DrawRow[]): void;
   vars: Record<string, string | number | boolean>;
@@ -26,7 +40,7 @@ export default function DrawSection(props: {
   aiPanel?: ReactNode;
   history: { undo(): void; redo(): void; canUndo: boolean; canRedo: boolean };
 }) {
-  const { rows, onChange, vars, varsError, refreshing, onRefreshData, aiPanel, history } = props;
+  const { serviceId, rows, onChange, vars, varsError, refreshing, onRefreshData, aiPanel, history } = props;
   // Below xl (stacked layout) the commands start collapsed so the preview is visible right away.
   const [collapsed, setCollapsed] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -35,6 +49,19 @@ export default function DrawSection(props: {
 
   const { ops, rowIds } = useMemo(() => toWireOpsWithRows(rows, vars), [rows, vars]);
   const varNames = useMemo(() => Object.keys(vars).sort(), [vars]);
+
+  // The user's devices on this Service by the frame schema their firmware reads, from the cached
+  // /devices list (other people's devices aren't in it).
+  const { data: myDevices } = useList("devices");
+  const devicesByFrame = useMemo(() => {
+    const out: Record<number, number> = {};
+    for (const d of myDevices ?? []) {
+      if (!serviceId || d.serviceId !== serviceId) continue;
+      const v = deviceFrameVersion(d.fw, !!d.lastPollAt);
+      if (v !== null) out[v] = (out[v] ?? 0) + 1;
+    }
+    return out;
+  }, [myDevices, serviceId]);
 
   const add = () => {
     const r = newRow(addOp);
@@ -71,6 +98,28 @@ export default function DrawSection(props: {
 
   const [full, setFull] = useState(false);
   const selRow = selectedId ? (rows.find((r) => r.id === selectedId) ?? null) : null;
+
+  // Clicking or tapping outside the preview and the commands panel clears the selection, and so
+  // does Escape when focus isn't in a text field (in full screen, Escape just closes full screen).
+  useEffect(() => {
+    if (!selectedId) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target instanceof Element ? e.target : null;
+      if (!t || !t.isConnected) return;
+      if (t.closest(KEEP_SELECTION) && !(t.closest(FULL_SCREEN) && !t.closest("[data-preview], button"))) return;
+      setSelectedId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || full || e.defaultPrevented || isTyping(document.activeElement)) return;
+      setSelectedId(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [selectedId, full]);
   const hint = previewHint(selRow);
 
   // One grid, two rows on xl: the headers share row 1 and the editor and preview share row 2, so
@@ -106,6 +155,7 @@ export default function DrawSection(props: {
 
       <section
         id="draw-commands-body"
+        data-draw-keep
         aria-label="Draw commands"
         className={`min-w-0 xl:col-start-1 xl:row-start-2 ${collapsed ? "hidden xl:block" : ""}`}
       >
@@ -120,13 +170,20 @@ export default function DrawSection(props: {
         {mode === "ai" ? (
           <div className="flex flex-col xl:h-[var(--preview-h)] [&>*]:min-h-0 [&>*]:flex-1">{aiPanel}</div>
         ) : mode === "rows" ? (
-          <DrawEditor rows={rows} onChange={onChange} variables={varNames} selectedId={selectedId} onSelect={setSelectedId} />
+          <DrawEditor
+            rows={rows}
+            onChange={onChange}
+            variables={varNames}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            devicesByFrame={devicesByFrame}
+          />
         ) : (
           <DrawJsonEditor rows={rows} onChange={onChange} />
         )}
       </section>
 
-      <div className="mt-3 flex h-7 min-w-0 items-center gap-1.5 xl:col-start-2 xl:row-start-1 xl:mt-0">
+      <div data-draw-keep className="mt-3 flex h-7 min-w-0 items-center gap-1.5 xl:col-start-2 xl:row-start-1 xl:mt-0">
         <p className="mr-auto min-w-0 truncate text-[12px] text-muted" title={hint}>
           {hint}
         </p>

@@ -18,6 +18,8 @@ export interface DrawEditorProps {
   variables: string[];
   selectedId: string | null;
   onSelect(id: string | null): void;
+  /** The user's devices on this Service, counted by the frame schema their firmware reads. */
+  devicesByFrame?: Record<number, number>;
 }
 
 const GROUPS = ["Screen", "Shapes", "Text"] as const;
@@ -77,6 +79,47 @@ function IntInput({
       }}
       className={`${inputCls} ${className ?? (isVar ? "w-28" : "w-14")} ${isVar ? "text-[#3ecf8e]" : ""} tabular-nums`}
     />
+  );
+}
+
+// Rotation: degrees (any whole number, or a {var}) plus quick picks. `note` is shown under it.
+function AngleInput({
+  field,
+  value,
+  onChange,
+  note,
+}: {
+  field: Field;
+  value: string | number;
+  onChange(v: string | number): void;
+  note?: string;
+}) {
+  const str = String(value ?? "");
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="relative">
+          <IntInput field={field} value={value} onChange={onChange} className="w-[84px] pr-5" />
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-[#5a5a5a]">°</span>
+        </span>
+        <span role="group" aria-label={`${field.label} presets`} className="inline-flex h-7 rounded-md border border-[#2e2e2e] bg-[#161616] p-0.5">
+          {(field.presets ?? []).map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={str === String(p)}
+              onClick={() => onChange(p)}
+              className={`rounded px-1.5 font-mono text-[11px] tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-[#3ecf8e] ${
+                str === String(p) ? "bg-[#2a2a2a] text-[#ededed]" : "text-[#a0a0a0] hover:text-[#ededed]"
+              }`}
+            >
+              {p}°
+            </button>
+          ))}
+        </span>
+      </div>
+      {(note || field.hint) && <p className={`text-[11px] ${note ? "text-amber-300/90" : "text-[#6b6b6b]"}`}>{note ?? field.hint}</p>}
+    </div>
   );
 }
 
@@ -324,30 +367,35 @@ const TRIANGLE: ParamLine[] = [
   { label: "Point 2", keys: ["x1", "y1"] },
   { label: "Point 3", keys: ["x2", "y2"] },
 ];
+// Rows without a rotation field just don't show this line.
+const ROTATE: ParamLine = { label: "Rotate", keys: ["angle"], span: true };
 const LAYOUT: Record<string, ParamLine[]> = {
   drawPixel: [POS],
   drawLine: [
     { label: "Start", keys: ["x0", "y0"] },
     { label: "End", keys: ["x1", "y1"] },
+    ROTATE,
   ],
   drawFastHLine: [POS, { label: "Length", keys: ["w"] }],
   drawFastVLine: [POS, { label: "Length", keys: ["h"] }],
-  drawRect: RECT,
-  fillRect: RECT,
-  drawRoundRect: ROUND_RECT,
-  fillRoundRect: ROUND_RECT,
+  drawRect: [...RECT, ROTATE],
+  fillRect: [...RECT, ROTATE],
+  drawRoundRect: [...ROUND_RECT, ROTATE],
+  fillRoundRect: [...ROUND_RECT, ROTATE],
   drawCircle: CIRCLE,
   fillCircle: CIRCLE,
-  drawTriangle: TRIANGLE,
-  fillTriangle: TRIANGLE,
+  drawTriangle: [...TRIANGLE, ROTATE],
+  fillTriangle: [...TRIANGLE, ROTATE],
   drawString: [
     { label: "Text", keys: ["text"], span: true },
     { label: "Position", keys: ["x", "y", "font"] },
+    ROTATE,
   ],
   text: [
     { label: "Text", keys: ["text"], span: true },
     { label: "Position", keys: ["x", "y", "datum"] },
     { label: "Style", keys: ["font", "size"] },
+    ROTATE,
   ],
 };
 
@@ -362,8 +410,16 @@ function GridField(props: {
   variables: string[];
   span?: boolean;
   col: number;
+  note?: string;
 }) {
-  const { field, value, onChange, variables, span, col } = props;
+  const { field, value, onChange, variables, span, col, note } = props;
+  if (field.presets) {
+    return (
+      <div className="col-[2/-1] flex min-w-0">
+        <AngleInput field={field} value={value} onChange={onChange} note={note} />
+      </div>
+    );
+  }
   if (field.type === "text" || span) {
     return (
       <div className="col-[2/-1] flex min-w-0">
@@ -399,7 +455,17 @@ function changeOp(row: DrawRow, op: string): DrawRow {
   return { ...row, op, args };
 }
 
-export default function DrawEditor({ rows, onChange, variables, selectedId: sel, onSelect: select }: DrawEditorProps) {
+// Under a field that older firmware draws degraded (e.g. text rotation), while it's in use and
+// some of the user's devices on this Service can't draw it yet.
+function olderDevicesNote(field: Field, value: unknown, byFrame: Record<number, number> | undefined): string | undefined {
+  if (!field.minFrame || !byFrame || value === undefined || value === "" || value === field.default) return undefined;
+  if (typeof value === "number" && value % 360 === 0) return undefined;
+  const n = Object.entries(byFrame).reduce((sum, [v, count]) => (Number(v) < field.minFrame! ? sum + count : sum), 0);
+  if (!n) return undefined;
+  return `${n} of your devices on this service ${n === 1 ? "runs" : "run"} older firmware and will show this unrotated until reflashed.`;
+}
+
+export default function DrawEditor({ rows, onChange, variables, selectedId: sel, onSelect: select, devicesByFrame }: DrawEditorProps) {
   const [armed, setArmed] = useState<string | null>(null); // row whose handle is pressed
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null); // insert-before index
@@ -622,6 +688,7 @@ export default function DrawEditor({ rows, onChange, variables, selectedId: sel,
                         value={row.args[f.key] ?? f.default}
                         variables={variables}
                         onChange={(v) => setArg(f.key, v)}
+                        note={olderDevicesNote(f, row.args[f.key], devicesByFrame)}
                       />
                     ))}
                     {/* Pad short lines so the next label starts a new grid row. */}

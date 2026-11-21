@@ -6,9 +6,13 @@
 //
 // The op player's `case` lines are generated from OPS (src/lib/draw/ops.ts) so
 // the firmware stays in step with the Draw editor. An op without a C++ mapping
-// here throws, so a new op can't silently go missing from the firmware.
+// here throws, so a new op can't silently go missing from the firmware. An op's rotation field is
+// left out: the server expands it (src/lib/draw/rotate.ts), except for text, which becomes the
+// device-only op drawStringRot (frame v2).
 
-import { DATUMS, OPS, type FieldType, type OpDef } from "../draw/ops";
+import { DATUMS, OPS, deviceFields, type FieldType, type OpDef } from "../draw/ops";
+import { TEXT_ROT_OP } from "../draw/rotate";
+import { FW_VERSION } from "./version";
 
 export interface FirmwareInput {
   serviceUrl: string;
@@ -24,7 +28,7 @@ export interface FirmwareFile {
 }
 
 export const SKETCH_DIR = "EspDisplay";
-export const FW_VERSION = "EspDisplay/1.1.0";
+export { FW_VERSION }; // defined in ./version.ts, which client code can import without the templates
 export const PLACEHOLDER_SSID = "YOUR_WIFI";
 export const PLACEHOLDER_PASSWORD = "YOUR_PASSWORD";
 export const PLACEHOLDER_KEY = "PASTE_DEVICE_KEY_HERE";
@@ -104,7 +108,7 @@ function fail(def: OpDef, why: string): never {
 // Check an op's fields still have the shape its C++ case was written for.
 // "color?" = optional trailing colour.
 function expectFields(def: OpDef, shape: string[]): void {
-  const actual = def.fields.map((f) => f.type + (f.optional ? "?" : ""));
+  const actual = deviceFields(def).map((f) => f.type + (f.optional ? "?" : ""));
   if (actual.join(",") !== shape.join(",")) {
     fail(def, `fields are [${actual.join(", ")}], expected [${shape.join(", ")}]`);
   }
@@ -124,11 +128,15 @@ const CUSTOM: Record<string, (def: OpDef) => string[]> = {
     expectFields(def, ["color", "color?"]);
     return [
       "{",
-      "  uint16_t fg, bg;",
+      "  uint16_t fg, bg = 0;",
       "  if (!col(a[1], fg)) break;",
       "  // One colour, an unreadable bg, or bg == fg: transparent background (TFT_eSPI's rule).",
-      "  if (a.size() > 2 && col(a[2], bg)) tft.setTextColor(fg, bg);",
+      "  bool hasBg = a.size() > 2 && col(a[2], bg);",
+      "  if (hasBg) tft.setTextColor(fg, bg);",
       "  else tft.setTextColor(fg);",
+      "  textFg = fg;",
+      "  textBg = bg;",
+      "  textHasBg = hasBg && bg != fg;",
       "  break;",
       "}",
     ];
@@ -138,7 +146,8 @@ const CUSTOM: Record<string, (def: OpDef) => string[]> = {
     return [
       "{",
       "  int32_t s = num(a[1]);",
-      "  tft.setTextSize(s < 1 ? 1 : s > 7 ? 7 : s);",
+      "  textSizeNow = s < 1 ? 1 : s > 7 ? 7 : (uint8_t)s;",
+      "  tft.setTextSize(textSizeNow);",
       "  break;",
       "}",
     ];
@@ -148,7 +157,9 @@ const CUSTOM: Record<string, (def: OpDef) => string[]> = {
     return [
       "{",
       "  int d = datumIndex(a[1]);",
-      "  if (d >= 0) tft.setTextDatum(DATUM_VALUES[d]);",
+      "  if (d < 0) break;",
+      "  tft.setTextDatum(DATUM_VALUES[d]);",
+      "  textDatumNow = d;",
       "  break;",
       "}",
     ];
@@ -168,31 +179,56 @@ const CUSTOM: Record<string, (def: OpDef) => string[]> = {
   },
 };
 
+// Device-only ops: made by the server, never a Draw row. Same body format as CUSTOM.
+const DEVICE_ONLY: Record<string, () => string[]> = {
+  [TEXT_ROT_OP]() {
+    // drawString's args, then the angle (degrees clockwise).
+    const def = OPS.find((d) => d.op === "drawString");
+    if (!def) throw new Error("firmware: drawStringRot needs the drawString op");
+    const check = fontOptions(def).map((n) => `f != ${n}`).join(" && ");
+    return [
+      "{",
+      "  int32_t f = a.size() > 4 ? num(a[4]) : 1;",
+      `  if (${check}) f = 1;  // fonts loaded by User_Setup.h`,
+      "  drawStringRotated(text(a[1]), num(a[2]), num(a[3]), (uint8_t)f, a.size() > 5 ? num(a[5]) : 0);",
+      "  break;",
+      "}",
+    ];
+  },
+};
+
 function shapeCase(def: OpDef): string[] {
   const allowed: FieldType[] = ["int", "color"];
-  if (def.fields.some((f) => !allowed.includes(f.type) || f.optional)) {
+  const fields = deviceFields(def);
+  if (fields.some((f) => !allowed.includes(f.type) || f.optional)) {
     fail(def, "shape ops must have only required int and colour fields");
   }
-  const colors = def.fields.filter((f) => f.type === "color").length;
+  const colors = fields.filter((f) => f.type === "color").length;
   if (colors !== 1) fail(def, `shape ops must have exactly one colour field (has ${colors})`);
-  const ci = def.fields.findIndex((f) => f.type === "color") + 1;
-  const args = def.fields.map((f, i) => (f.type === "color" ? "c" : `num(a[${i + 1}])`));
+  const ci = fields.findIndex((f) => f.type === "color") + 1;
+  const args = fields.map((f, i) => (f.type === "color" ? "c" : `num(a[${i + 1}])`));
   return [`{ uint16_t c; if (col(a[${ci}], c)) tft.${def.op}(${args.join(", ")}); break; }`];
 }
 
 function caseLines(): string {
   const seen = new Map<number, string>();
   const out: string[] = [];
-  for (const def of OPS) {
-    if (def.expand) continue; // editor-only: the server expands it into other ops
+  const cases: { def: OpDef; body: () => string[] }[] = [
+    ...OPS.filter((def) => !def.expand) // editor-only ops are expanded by the server into other ops
+      .map((def) => {
+        const custom = Object.prototype.hasOwnProperty.call(CUSTOM, def.op) ? CUSTOM[def.op] : undefined;
+        return { def, body: () => (custom ? custom(def) : SHAPE_OPS.has(def.op) ? shapeCase(def) : fail(def, "no mapping")) };
+      }),
+    ...Object.entries(DEVICE_ONLY).map(([op, body]) => ({ def: { op, label: op, group: "Text", fields: [] } as OpDef, body })),
+  ];
+  for (const { def, body: make } of cases) {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(def.op)) fail(def, "op name is not a C++ identifier");
     const h = fnv1a(def.op);
     const clash = seen.get(h);
     if (clash) fail(def, `opHash collides with "${clash}"`);
     seen.set(h, def.op);
 
-    const custom = Object.prototype.hasOwnProperty.call(CUSTOM, def.op) ? CUSTOM[def.op] : undefined;
-    const body = custom ? custom(def) : SHAPE_OPS.has(def.op) ? shapeCase(def) : fail(def, "no mapping");
+    const body = make();
     const head = `case opHash("${def.op}"):`;
     if (body.length === 1) {
       out.push(`      ${head.padEnd(32)} ${body[0]}`);
@@ -337,6 +373,21 @@ Open **Tools > Serial Monitor** at 115200 baud to see what the device is doing.
 - Colours look like a photo negative? Flip \`tft.invertDisplay(false)\` in \`setup()\` to \`true\`.
 - \`EspDisplay.ino\` and \`User_Setup.h\` are the same for every device; only
   \`config.h\` changes.
+
+## Firmware versions
+
+This is **${FW_VERSION}**. The device reports its version to the portal (Devices >
+details), and the portal flags a device whose screen uses something its firmware
+can't draw yet.
+
+- **2.0.0**: rotated text, and flipping the screen 180 degrees (set per device on the
+  portal's Devices page, for a display mounted upside down). The orientation is
+  remembered across restarts.
+- Devices still on **1.x** keep working with no changes: they get the same frames as
+  before. Rotated shapes draw the same on them; rotated text is drawn unrotated and the
+  screen flip setting is ignored until the device is reflashed with these files.
+  To update, download the setup files again and upload them (same steps as above;
+  your \`config.h\` can be kept).
 `;
 }
 
@@ -347,8 +398,11 @@ function sketchIno(): string {
 // This file is the same for every device. Per-device settings are in config.h.
 // The op player below is generated from the portal's Draw ops; don't edit it by hand.
 //
-// Protocol: GET SERVICE_URL?since=<id> with "Authorization: Bearer <key>".
-//   200 JSON {v, id, next, poll, ops}  draw ops, poll again in next seconds
+// Protocol: GET SERVICE_URL?since=<id> with "Authorization: Bearer <key>" and
+// "X-Frame-Version: 2" (this firmware reads frame schemas 1 and 2).
+//   200 JSON {v, id, next, poll, rot, ops}  draw ops, poll again in next seconds
+//                                v2 adds "rot" (1 or 3, the screen orientation set in the
+//                                portal) and the drawStringRot op; v1 frames have neither
 //   304                          unchanged
 //   204                          Service disabled, poll again in X-Next-Poll seconds
 //   401                          device key rejected
@@ -362,6 +416,7 @@ function sketchIno(): string {
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <esp_timer.h>
@@ -392,6 +447,7 @@ const uint32_t WIFI_RETRY_MS = 15000;
 const uint16_t HTTP_TIMEOUT_MS = 15000;
 
 TFT_eSPI tft = TFT_eSPI();
+Preferences prefs;          // flash storage: remembers the screen orientation across restarts
 
 String lastId;              // id of the frame on screen; sent back as ?since=
 String frameJson;           // that frame's JSON, to redraw it without the red dot
@@ -403,6 +459,14 @@ bool wifiWasUp = false;
 uint32_t nextPollAt = 0;    // millis() of the next poll
 uint32_t pollIntervalS = DEFAULT_POLL_S;  // this device's poll interval, from the server
 uint32_t lastWifiRetry = 0;
+uint8_t screenRotation = 1; // tft.setRotation(): 1 landscape, 3 landscape turned 180 degrees
+
+// The text state set by the frame's ops, kept here too for drawStringRotated().
+uint16_t textFg = TFT_WHITE;
+uint16_t textBg = TFT_BLACK;
+bool textHasBg = false;     // false: transparent background
+uint8_t textSizeNow = 1;
+int textDatumNow = 0;       // index into DATUM_VALUES (0 = TL)
 
 // ---------------------------------------------------------------------------
 // Screens
@@ -539,6 +603,57 @@ int datumIndex(JsonVariantConst v) {
   return -1;
 }
 
+// Turns the panel to rot (1 or 3; anything else is 1) and remembers it, so messages shown
+// after a restart are the right way up too. The caller redraws the whole screen.
+void applyRotation(int rot) {
+  uint8_t r = rot == 3 ? 3 : 1;
+  if (r == screenRotation) return;
+  screenRotation = r;
+  tft.setRotation(r);
+  prefs.putUChar("rot", r);
+  Serial.printf("[screen] rotation %u\n", (unsigned)r);
+}
+
+// drawString at an angle (degrees clockwise) about the centre of the text's unrotated box, with
+// the current text colour, size and datum. The text is drawn into a 1-bit sprite (w * h / 8 bytes,
+// created and freed here) that is pushed rotated; if there isn't memory for it, the text is drawn
+// unrotated instead.
+void drawStringRotated(const String& s, int32_t x, int32_t y, uint8_t font, int32_t angle) {
+  angle %= 360;
+  if (angle < 0) angle += 360;
+  int16_t w = tft.textWidth(s, font);
+  int16_t h = tft.fontHeight(font);
+  if (angle == 0 || s.length() == 0 || w <= 0 || h <= 0) {
+    tft.drawString(s, x, y, font);
+    return;
+  }
+  // Datum -> the box's top-left: DATUM_NAMES runs TL TC TR ML MC MR BL BC BR.
+  int c = textDatumNow % 3, r = textDatumNow / 3;
+  int32_t left = x - (c == 1 ? w / 2 : c == 2 ? w : 0);
+  int32_t top = y - (r == 1 ? h / 2 : r == 2 ? h : 0);
+
+  TFT_eSprite spr = TFT_eSprite(&tft);
+  spr.setColorDepth(1);
+  if (spr.createSprite(w, h) == nullptr) {
+    Serial.printf("[draw] no memory for rotated text (%dx%d), drawing it unrotated\n", w, h);
+    tft.drawString(s, x, y, font);
+    return;
+  }
+  spr.fillSprite(TFT_BLACK);   // bit 0: background
+  spr.setTextColor(TFT_WHITE); // bit 1: ink
+  spr.setTextSize(textSizeNow);
+  spr.setTextDatum(TL_DATUM);
+  spr.drawString(s, 0, 0, font);
+  // A transparent background is pushed as a key colour that can't be the ink colour.
+  uint16_t bg = textHasBg ? textBg : (uint16_t)(textFg ^ 0xFFFF);
+  spr.setBitmapColor(textFg, bg);
+  spr.setPivot(w / 2, h / 2);
+  tft.setPivot((int16_t)(left + w / 2), (int16_t)(top + h / 2));
+  if (textHasBg) spr.pushRotated((int16_t)angle);
+  else spr.pushRotated((int16_t)angle, bg);
+  spr.deleteSprite();
+}
+
 // Draw one frame. Starts from the same state as the portal's preview: black
 // screen, white text with a transparent background, size 1, font 1, datum TL.
 void playFrame(JsonArrayConst ops) {
@@ -549,6 +664,11 @@ void playFrame(JsonArrayConst ops) {
   tft.setTextSize(1);
   tft.setTextFont(1);
   tft.setTextDatum(TL_DATUM);
+  textFg = TFT_WHITE;
+  textBg = TFT_BLACK;
+  textHasBg = false;
+  textSizeNow = 1;
+  textDatumNow = 0;
 
   for (JsonVariantConst item : ops) {
     JsonArrayConst a = item.as<JsonArrayConst>();
@@ -564,7 +684,7 @@ void playFrame(JsonArrayConst ops) {
   shownMessage = "";
 }
 
-// Parse and draw a frame body. Returns false (and draws nothing) if it isn't a v1 frame.
+// Parse and draw a frame body. Returns false (and draws nothing) if it isn't a v1 or v2 frame.
 // next and poll are the frame's "next" and "poll" fields (0 if missing).
 bool playJson(const String& body, String& error, long& next, long& poll) {
   JsonDocument doc;
@@ -573,10 +693,13 @@ bool playJson(const String& body, String& error, long& next, long& poll) {
     error = String("Bad JSON: ") + err.c_str();
     return false;
   }
-  if ((doc["v"] | 0) != 1) {
+  int version = doc["v"] | 0;
+  if (version != 1 && version != 2) {
     error = "Unsupported frame version";
     return false;
   }
+  // v2 frames say which way up the screen goes; v1 frames are always normal landscape.
+  applyRotation(version >= 2 ? (int)(doc["rot"] | 1) : 1);
   playFrame(doc["ops"].as<JsonArrayConst>());
   lastId = doc["id"] | "";
   frameJson = body;
@@ -624,6 +747,7 @@ uint32_t poll() {
   http.addHeader("X-Heap", String(ESP.getFreeHeap()));
   http.addHeader("X-Uptime", String((uint32_t)(esp_timer_get_time() / 1000000LL)));
   http.addHeader("X-FW", FW_VERSION);
+  http.addHeader("X-Frame-Version", "2");  // newest frame schema this firmware reads
   const char* headerKeys[] = {"X-Next-Poll", "X-Poll-Interval"};
   http.collectHeaders(headerKeys, 2);
 
@@ -737,7 +861,9 @@ void setup() {
   pinMode(BACKLIGHT_PIN, OUTPUT);
   digitalWrite(BACKLIGHT_PIN, HIGH);
   tft.init();
-  tft.setRotation(1);
+  prefs.begin("espdisplay", false);
+  screenRotation = prefs.getUChar("rot", 1) == 3 ? 3 : 1;  // last orientation the portal sent
+  tft.setRotation(screenRotation);
   // The ST7789 init turns colour inversion on; this panel needs it off. If colours look like a
   // photo negative on your board, change false to true.
   tft.invertDisplay(false);

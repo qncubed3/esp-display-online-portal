@@ -1,8 +1,11 @@
 // Direct manipulation on the Draw preview: which handles a row's shape gets, and how dragging the
 // shape or a handle changes the row's numbers. Works on DrawRows (not WireOps) so edits land in the
 // editor; a row whose coordinates use {variables} can't be dragged (there's no number to change).
+// A rotated row (non-zero "angle") can be moved but has no resize grips: its numbers describe the
+// unrotated shape, so dragging a grip of the rotated outline wouldn't map onto them simply.
 
-import type { DrawRow } from "./ops";
+import { ANGLE_KEY, type DrawRow } from "./ops";
+import { normalizeAngle } from "./rotate";
 
 // A grip, in continuous screen coordinates: (0,0) is the top-left corner of the screen and
 // (320,240) the bottom-right, so a box's edge sits at x and x + w and a pixel's centre at x + 0.5.
@@ -46,6 +49,13 @@ function numbers(row: DrawRow): Record<string, number> | null {
   return Object.keys(out).length ? out : null;
 }
 
+/** True when the row is turned (or its angle is a {variable}, so it may be). */
+export function isRotated(row: DrawRow): boolean {
+  const v = row.args[ANGLE_KEY];
+  if (v === undefined || v === "") return false;
+  return typeof v === "string" && /\{\w+\}/.test(v) ? true : normalizeAngle(v) !== 0;
+}
+
 export function canDrag(row: DrawRow): boolean {
   return row.op !== "fillScreen" && numbers(row) !== null;
 }
@@ -61,7 +71,7 @@ function resizeBox(row: DrawRow, n: Record<string, number>) {
 
 export function handlesFor(row: DrawRow): Handle[] {
   const n = numbers(row);
-  if (!n) return [];
+  if (!n || isRotated(row)) return [];
   if (RECTS.has(row.op)) {
     const l = n.x, t = n.y, r = n.x + n.w, b = n.y + n.h, cx = n.x + n.w / 2, cy = n.y + n.h / 2;
     return [
@@ -88,7 +98,7 @@ export function handlesFor(row: DrawRow): Handle[] {
 // of its size so a small shape's middle still moves it.
 export function edgeHandleAt(row: DrawRow, px: number, py: number, tol: number): string | null {
   const n = numbers(row);
-  if (!n) return null;
+  if (!n || isRotated(row)) return null;
   const box = resizeBox(row, n);
   if (!box || box.w <= 0 || box.h <= 0) return null;
   const l = box.x, t = box.y, r = box.x + box.w, b = box.y + box.h;

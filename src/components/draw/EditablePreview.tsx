@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import { createPortal } from "react-dom";
 import { Minimize2 } from "lucide-react";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type DrawRow, type WireOp } from "@/lib/draw/ops";
-import { applyDrag, canDrag, cursorFor, edgeHandleAt, handlesFor } from "@/lib/draw/geometry";
+import { applyDrag, canDrag, cursorFor, edgeHandleAt, handlesFor, isRotated } from "@/lib/draw/geometry";
 import { opBounds } from "@/lib/draw/preview";
 import DevicePreview from "./DevicePreview";
 
@@ -27,7 +27,9 @@ export const INLINE_FRAME_HEIGHT = SCREEN_HEIGHT * INLINE_SCALE + 26;
 /** What the preview's hint line says for the selected row. */
 export function previewHint(selRow: DrawRow | null): string {
   if (!selRow) return "Click a shape to select its row";
-  if (canDrag(selRow)) return "Drag to move · grips resize · arrows nudge (Shift ×10)";
+  if (canDrag(selRow)) {
+    return isRotated(selRow) ? "Drag to move · arrows nudge · no resize grips while rotated" : "Drag to move · grips resize · arrows nudge (Shift ×10)";
+  }
   return selRow.op === "fillScreen" ? "Fill screen covers the whole screen" : "Uses {variables} for its position, so it can't be dragged";
 }
 
@@ -90,9 +92,23 @@ export default function EditablePreview({
   const [fullScale, setFullScale] = useState(2);
   const [cssWidth, setCssWidth] = useState(0); // canvas width in CSS px, for placing grips
 
-  // A row can make several ops (e.g. "text"); its box is the one op that draws something.
+  // A row can make several ops (e.g. "text", or a rotated rectangle's triangles); its box covers them all.
   const selRow = selectedId ? rowById.get(selectedId) ?? null : null;
-  const selBox = selRow ? (bounds.find((b, i) => b && rowIds[i] === selRow.id) ?? null) : null;
+  const selBox = useMemo(() => {
+    if (!selRow) return null;
+    let out: Box | null = null;
+    bounds.forEach((b, i) => {
+      if (!b || rowIds[i] !== selRow.id) return;
+      if (!out) out = { ...b };
+      else {
+        const r = Math.max(out.x + out.w, b.x + b.w), btm = Math.max(out.y + out.h, b.y + b.h);
+        out = { x: Math.min(out.x, b.x), y: Math.min(out.y, b.y), w: 0, h: 0 };
+        out.w = r - out.x;
+        out.h = btm - out.y;
+      }
+    });
+    return out as Box | null;
+  }, [selRow, bounds, rowIds]);
   const movable = selRow ? canDrag(selRow) : false;
   const handles = selRow && movable ? handlesFor(selRow) : [];
 
@@ -216,8 +232,12 @@ export default function EditablePreview({
     const { x, y, unit } = pointOn(e, c);
     const t = targetAt(x, y, unit);
     const onScreen = x >= 0 && y >= 0 && x < SCREEN_WIDTH && y < SCREEN_HEIGHT;
-    // Grips poke out past the canvas; anywhere else outside it isn't ours.
-    if (!onScreen && t?.kind !== "handle") return;
+    // Grips poke out past the canvas; a press anywhere else off the screen (the device frame, the
+    // full-screen editor's margins) just clears the selection.
+    if (!onScreen && t?.kind !== "handle") {
+      onSelect(null);
+      return;
+    }
     e.preventDefault();
     c.focus({ preventScroll: true });
 
@@ -231,6 +251,13 @@ export default function EditablePreview({
     }
     const row = rowById.get(rowIds[t.index]);
     if (!row) return;
+    // The background (Fill screen, a full-screen rect) works like empty canvas while something else
+    // is selected: the press deselects. With nothing selected it selects the background's row.
+    const b = bounds[t.index];
+    if (selectedId && row.id !== selectedId && b && isFullScreen(b)) {
+      onSelect(null);
+      return;
+    }
     if (row.id !== selectedId) {
       onSelect(row.id);
       // Bring the row's card to the top of the visible area.
@@ -355,6 +382,7 @@ export default function EditablePreview({
         createPortal(
           <div
             role="dialog"
+            data-full-editor
             aria-modal="true"
             aria-label="Full-screen preview editor"
             className="fixed inset-0 z-[100] flex flex-col bg-black/90 p-4 backdrop-blur-sm sm:p-6"

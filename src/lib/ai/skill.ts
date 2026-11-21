@@ -8,7 +8,7 @@
 // The Data limits mirror the constants in src/lib/data/run.ts (not imported, because that
 // module pulls in the QuickJS sandbox and this one is used client-side). Keep them in sync.
 
-import { DATUMS, OPS, SCREEN_HEIGHT, SCREEN_WIDTH, SWATCHES, type Field, type OpDef } from "@/lib/draw/ops";
+import { ANGLE_KEY, DATUMS, OPS, SCREEN_HEIGHT, SCREEN_WIDTH, SWATCHES, hasAngle, type Field, type OpDef } from "@/lib/draw/ops";
 import { formatWire, rowsToWire } from "@/lib/draw/wire";
 
 const DATA_LIMITS = {
@@ -48,7 +48,8 @@ function opSection(def: OpDef): string {
   const args = def.fields.map((f, i) => {
     const labels = f.type === "select" && f.options?.some((o) => o.label !== String(o.value)) ? ` (${f.options.map((o) => o.label).join(", ")})` : "";
     const opt = f.optional ? `; optional, default omitted` : `; default ${JSON.stringify(f.default)}`;
-    return `${i + 1}. \`${f.key}\`: ${fieldType(f)}. ${f.label}${labels}${opt}`;
+    const more = f.key === ANGLE_KEY ? `, degrees clockwise about the item's centre (0 = upright)${f.minFrame ? "; needs firmware 2.0, older devices draw it unrotated" : ""}` : "";
+    return `${i + 1}. \`${f.key}\`: ${fieldType(f)}. ${f.label}${labels}${more}${opt}`;
   });
   return [`#### \`${def.op}\` (${def.label})`, "", `\`${sig}\`, e.g. \`${example}\``, "", ...args].join("\n");
 }
@@ -60,6 +61,7 @@ function drawContract(h: string): string {
     .map((g) => [`${h}## ${g}`, "", ...OPS.filter((d) => d.group === g).map(opSection)].join("\n\n"))
     .join("\n\n");
   const swatches = SWATCHES.map((s) => `${s.name} \`${s.hex}\``).join(", ");
+  const rotatable = OPS.filter(hasAngle).map((d) => `\`${d.op}\``).join(", ");
 
   return `${h} Draw ops contract
 
@@ -88,6 +90,12 @@ Text state is **sticky, like TFT_eSPI**: \`setTextColor\`, \`setTextSize\` and \
 - \`setTextColor\` with only \`fg\` draws transparent-background text. With \`bg\` (different from \`fg\`), the text box is filled with \`bg\` first, which is handy for labels on bars.
 - \`setTextDatum\` sets which point of the text's box sits at \`(x, y)\`: first letter T/M/B = top/middle/bottom, second letter L/C/R = left/centre/right. Values: ${DATUMS.map((d) => `\`"${d}"\``).join(" ")}. Use \`"TC"\`/\`"MC"\` with \`x = ${W / 2}\` to centre text, \`"TR"\`/\`"MR"\` with \`x = ${W - 8}\` to right-align, \`"ML"\` to vertically centre a label in a bar.
 - \`setTextSize\` (1-7) is an integer multiplier on the font's pixels.
+
+Rotation: ${rotatable} take an optional **last** arg \`angle\`, in degrees clockwise (any whole number; 90, 180 and 270 are the usual ones). The item turns about its centre: the centre of its box (for text, the box the unrotated text covers, placed by the datum as usual; for a line, its midpoint). Leave it off (or 0) for upright. Since it's last, earlier optional args must be given to reach it: \`["drawString", "Hi", 160, 120, 2, 90]\`, or for \`text\` pass \`""\` as \`bg\` to keep a transparent background: \`["text", "Hi", 160, 120, 2, 1, "MC", "#FFFFFF", "", 90]\`.
+
+- Rotated shapes work on every device (the server turns them into triangles and lines; rounded corners at angles other than 90/180/270 become short straight segments).
+- Rotated **text needs firmware 2.0** on the device; devices on older firmware draw it unrotated, so keep it readable either way (don't let unrotated text overlap other things).
+- Flipping the **whole screen** 180 degrees (a display mounted upside down) is a per-device setting on the portal's Devices page, not something Draw ops can do. Always lay out for the normal ${W}x${H} landscape, never pre-rotate the design.
 
 Fonts (\`drawString\`'s last arg), size at text size 1 (multiply by \`setTextSize\`):
 

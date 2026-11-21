@@ -3,7 +3,11 @@
 // - the browser preview (plays WireOps on a canvas)
 // - the device endpoint (turns saved rows into WireOps for the ESP32)
 //
-// Field order = TFT_eSPI argument order, so a WireOp is `[op, ...fieldValues]`.
+// Field order = TFT_eSPI argument order, so a WireOp is `[op, ...fieldValues]`. The exception is
+// the optional trailing "angle" (rotation) arg: toWireOps consumes it (src/lib/draw/rotate.ts), so
+// it never reaches the device as-is.
+
+import { normalizeAngle, rotateOp } from "./rotate";
 
 export const SCREEN_WIDTH = 320;
 export const SCREEN_HEIGHT = 240;
@@ -16,7 +20,11 @@ export interface Field {
   type: FieldType;
   default: string | number;
   options?: { value: string | number; label: string }[]; // for "select"
-  optional?: boolean; // trailing optional arg: an empty value is left off the WireOp
+  optional?: boolean; // trailing optional arg: left off the WireOp when empty ("" or its default)
+  presets?: number[]; // quick picks shown next to an "int" field (e.g. rotation angles)
+  hint?: string; // shown under the field in the editor
+  /** Lowest frame schema that draws a non-default value; older devices degrade it (see capabilities.ts). */
+  minFrame?: number;
 }
 
 export interface OpDef {
@@ -38,14 +46,24 @@ export interface DrawRow {
 
 export type WireOp = [string, ...(string | number)[]];
 
-// What the device endpoint returns.
-export interface Frame {
-  v: 1;
-  id: string; // hash of ops; the device sends it back as ?since=
+// What the device endpoint returns (built in src/lib/draw/frame.ts). The schema is negotiated:
+// firmware 2.0+ sends X-Frame-Version: 2 and gets v2; everything else gets v1, exactly as before.
+interface FrameBase {
+  id: string; // hash of everything drawn (version, orientation, ops); the device sends it back as ?since=
   next: number; // seconds until the next poll
   poll: number; // this device's poll interval (the device stores it); also sent as X-Poll-Interval
   ops: WireOp[];
 }
+/** Firmware 1.x: rejects any other `v`, skips unknown ops. No drawStringRot (degraded to drawString). */
+export interface FrameV1 extends FrameBase {
+  v: 1;
+}
+/** Firmware 2.0+: adds `rot` and the drawStringRot op. */
+export interface FrameV2 extends FrameBase {
+  v: 2;
+  rot: 1 | 3; // tft.setRotation(): 1 = landscape, 3 = landscape turned 180 degrees (the device's setting)
+}
+export type Frame = FrameV1 | FrameV2;
 
 const x = (d = 0): Field => ({ key: "x", label: "X", type: "int", default: d });
 const y = (d = 0): Field => ({ key: "y", label: "Y", type: "int", default: d });
@@ -53,6 +71,13 @@ const w = (d = 50): Field => ({ key: "w", label: "Width", type: "int", default: 
 const h = (d = 30): Field => ({ key: "h", label: "Height", type: "int", default: d });
 const r = (d = 10): Field => ({ key: "r", label: "Radius", type: "int", default: d });
 const color = (key = "color", label = "Colour", d = "#FFFFFF"): Field => ({ key, label, type: "color", default: d });
+export const ANGLE_KEY = "angle";
+// Rotation in degrees clockwise about the item's centre; trailing and optional, so rows and
+// JSON saved before it existed load unchanged. Any whole number works; the presets are quick picks.
+const angle = (textOnly = false): Field => ({
+  key: ANGLE_KEY, label: "Rotation", type: "int", default: 0, optional: true, presets: [0, 90, 180, 270],
+  ...(textOnly ? { minFrame: 2, hint: "Rotated text needs firmware 2.0 on the device; older firmware draws it unrotated." } : {}),
+});
 const pt = (n: number, dx: number, dy: number): Field[] => [
   { key: `x${n}`, label: `X${n}`, type: "int", default: dx },
   { key: `y${n}`, label: `Y${n}`, type: "int", default: dy },
@@ -64,21 +89,21 @@ export const OPS: OpDef[] = [
   { op: "fillScreen", label: "Fill screen", group: "Screen", fields: [color("color", "Colour", "#000000")] },
 
   { op: "drawPixel", label: "Pixel", group: "Shapes", fields: [x(), y(), color()] },
-  { op: "drawLine", label: "Line", group: "Shapes", fields: [...pt(0, 0, 0), ...pt(1, 50, 50), color()] },
+  { op: "drawLine", label: "Line", group: "Shapes", fields: [...pt(0, 0, 0), ...pt(1, 50, 50), color(), angle()] },
   { op: "drawFastHLine", label: "Horizontal line", group: "Shapes", fields: [x(), y(), w(320), color()] },
   { op: "drawFastVLine", label: "Vertical line", group: "Shapes", fields: [x(), y(), h(240), color()] },
-  { op: "drawRect", label: "Rectangle outline", group: "Shapes", fields: [x(), y(), w(), h(), color()] },
-  { op: "fillRect", label: "Rectangle", group: "Shapes", fields: [x(), y(), w(), h(), color()] },
-  { op: "drawRoundRect", label: "Rounded rectangle outline", group: "Shapes", fields: [x(), y(), w(), h(), r(6), color()] },
-  { op: "fillRoundRect", label: "Rounded rectangle", group: "Shapes", fields: [x(), y(), w(), h(), r(6), color()] },
+  { op: "drawRect", label: "Rectangle outline", group: "Shapes", fields: [x(), y(), w(), h(), color(), angle()] },
+  { op: "fillRect", label: "Rectangle", group: "Shapes", fields: [x(), y(), w(), h(), color(), angle()] },
+  { op: "drawRoundRect", label: "Rounded rectangle outline", group: "Shapes", fields: [x(), y(), w(), h(), r(6), color(), angle()] },
+  { op: "fillRoundRect", label: "Rounded rectangle", group: "Shapes", fields: [x(), y(), w(), h(), r(6), color(), angle()] },
   { op: "drawCircle", label: "Circle outline", group: "Shapes", fields: [x(160), y(120), r(), color()] },
   { op: "fillCircle", label: "Circle", group: "Shapes", fields: [x(160), y(120), r(), color()] },
-  { op: "drawTriangle", label: "Triangle outline", group: "Shapes", fields: [...pt(0, 10, 40), ...pt(1, 30, 10), ...pt(2, 50, 40), color()] },
-  { op: "fillTriangle", label: "Triangle", group: "Shapes", fields: [...pt(0, 10, 40), ...pt(1, 30, 10), ...pt(2, 50, 40), color()] },
+  { op: "drawTriangle", label: "Triangle outline", group: "Shapes", fields: [...pt(0, 10, 40), ...pt(1, 30, 10), ...pt(2, 50, 40), color(), angle()] },
+  { op: "fillTriangle", label: "Triangle", group: "Shapes", fields: [...pt(0, 10, 40), ...pt(1, 30, 10), ...pt(2, 50, 40), color(), angle()] },
 
   {
     // Everything for one piece of text on one card. Expands to the four TFT_eSPI calls below.
-    // Background is last so it can be left empty (transparent).
+    // Background can be left empty (transparent); rotation is last.
     op: "text", label: "Text", group: "Text",
     fields: [
       { key: "text", label: "Text", type: "text", default: "Hello" },
@@ -90,6 +115,7 @@ export const OPS: OpDef[] = [
       { key: "datum", label: "Anchor", type: "select", default: "TL", options: DATUMS.map((d) => ({ value: d, label: d })) },
       color("fg", "Text"),
       { ...color("bg", "Background", ""), optional: true },
+      angle(true),
     ],
     expand: ([text, x, y, font, size, datum, fg, bg]) => [
       bg === undefined || bg === "" ? ["setTextColor", fg] : ["setTextColor", fg, bg],
@@ -118,9 +144,19 @@ export const OPS: OpDef[] = [
       { key: "font", label: "Font", type: "select", default: 1, options: [
         { value: 1, label: "1: small (8px)" }, { value: 2, label: "2: 16px" }, { value: 4, label: "4: 26px" },
       ] },
+      angle(true),
     ],
   },
 ];
+
+/** True when the op's last field is the rotation, which toWireOps turns into other ops. */
+export const hasAngle = (def: OpDef) => def.fields[def.fields.length - 1]?.key === ANGLE_KEY;
+
+/** Fields the device op takes (without the rotation). */
+export const deviceFields = (def: OpDef) => (hasAngle(def) ? def.fields.slice(0, -1) : def.fields);
+
+/** An optional trailing arg at its empty value, which is left off the op. */
+export const isEmptyArg = (f: Field, v: unknown) => !!f.optional && (v === "" || v === f.default);
 
 export const OP_BY_NAME: Record<string, OpDef> = Object.fromEntries(OPS.map((d) => [d.op, d]));
 
@@ -157,11 +193,15 @@ export function toWireOpsWithRows(rows: DrawRow[], vars: Record<string, unknown>
       const raw = rowArgs[f.key];
       let v: string | number = typeof raw === "string" || typeof raw === "number" ? raw : f.default;
       if (typeof v === "string") v = fill(v, vars);
-      if (f.optional && v === "") break;
-      if (f.type === "int" || (f.type === "select" && typeof f.default === "number")) v = Math.round(Number(v) || 0);
+      if ((f.type === "int" || (f.type === "select" && typeof f.default === "number")) && !(f.optional && v === "")) {
+        v = Math.round(Number(v) || 0);
+      }
       args.push(v);
     }
-    const made: WireOp[] = def.expand ? def.expand(args) : [[def.op, ...args]];
+    const deg = hasAngle(def) ? normalizeAngle(args.pop()) : 0;
+    while (args.length && isEmptyArg(def.fields[args.length - 1], args[args.length - 1])) args.pop();
+    let made: WireOp[] = def.expand ? def.expand(args) : [[def.op, ...args]];
+    if (deg) made = made.flatMap((op) => rotateOp(op, deg));
     out.push(...made);
     for (let i = 0; i < made.length; i++) rowIds.push(row.id);
   }
