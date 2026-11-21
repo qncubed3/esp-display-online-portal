@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
 const DRAWER_ID = "mobile-nav-drawer";
+// Slide-out time. Links in the drawer wait this long before navigating: every page renders its
+// own AppShell, so navigating at once would unmount the drawer mid-slide.
+const CLOSE_MS = 200;
 
 // Below `md`: hamburger button + slide-in drawer holding the server-rendered sidebar (passed as children).
 // The drawer overlays the page, so the content never shifts.
 export default function MobileNav({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   // Remember which path the drawer was opened on: navigating anywhere else closes it without an effect.
   const [openedOn, setOpenedOn] = useState<string | null>(null);
   const open = openedOn === pathname;
@@ -28,7 +32,8 @@ export default function MobileNav({ children }: { children: ReactNode }) {
     }
     wasOpen.current = true;
     const panel = panelRef.current;
-    panel?.focus();
+    // preventScroll: focusing the panel mid-slide would otherwise scroll it into view and jump.
+    panel?.focus({ preventScroll: true });
 
     // Lock scrolling behind the drawer: the page and the app's own scroll container.
     const main = document.getElementById("app-main");
@@ -86,9 +91,9 @@ export default function MobileNav({ children }: { children: ReactNode }) {
       <div
         aria-hidden="true"
         onClick={close}
-        // Fades in over 200ms ease-out, out a little faster with ease-in; no fade with reduced motion.
+        // Fades with the drawer's timing; no fade with reduced motion.
         className={`fixed inset-0 z-40 bg-black/60 transition-[opacity,visibility] motion-reduce:transition-none ${
-          open ? "opacity-100 duration-200 ease-out" : "pointer-events-none invisible opacity-0 duration-150 ease-in"
+          open ? "opacity-100 duration-300 ease-out" : "pointer-events-none invisible opacity-0 duration-200 ease-in"
         }`}
       />
 
@@ -100,13 +105,23 @@ export default function MobileNav({ children }: { children: ReactNode }) {
         aria-label="Navigation"
         tabIndex={-1}
         inert={!open}
-        // Following any link closes the drawer, including one to the page that is already open.
+        // Following any link closes the drawer (including one to the page that is already open),
+        // then navigates once it has slid out. Modified clicks (new tab etc.) keep their default.
         onClick={(e) => {
-          if ((e.target as HTMLElement).closest("a")) close();
+          const link = (e.target as HTMLElement).closest("a");
+          if (!link) return;
+          close();
+          const href = link.getAttribute("href");
+          if (!href || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || link.target === "_blank" || href.startsWith("http")) return;
+          e.preventDefault();
+          if (href !== pathname) setTimeout(() => router.push(href), CLOSE_MS);
         }}
         // Always mounted so it can slide out: `visibility` flips only after the exit transform finishes.
+        // Opens over 300ms on a decelerating curve (fast start, soft landing); closes in 200ms.
         className={`fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-border bg-panel shadow-2xl outline-none transition-[transform,visibility] will-change-transform motion-reduce:transition-none ${
-          open ? "translate-x-0 duration-200 ease-out" : "invisible -translate-x-full duration-150 ease-in"
+          open
+            ? "translate-x-0 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+            : "invisible -translate-x-full duration-200 ease-[cubic-bezier(0.4,0,1,1)]"
         }`}
       >
         {children}

@@ -65,7 +65,7 @@ export default function AppShell({
   );
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-panel md:flex">{sidebar}</aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -93,7 +93,9 @@ export default function AppShell({
         {/* The only scroll container on signed-in pages. `relative` makes it the containing block for
             absolutely positioned descendants without a closer positioned ancestor (e.g. `sr-only` spans);
             otherwise they resolve against the viewport and stretch the document, adding a second scrollbar. */}
-        <main id="app-main" className="relative min-h-0 flex-1 overflow-auto">{children}</main>
+        <main id="app-main" className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+          {children}
+        </main>
       </div>
     </div>
   );

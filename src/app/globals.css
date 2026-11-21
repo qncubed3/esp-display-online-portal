@@ -20,6 +20,13 @@
   color-scheme: dark;
 }
 
+/* Never scroll sideways: anything too wide (a table, a code block) scrolls inside its own box. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background: #171717;
   color: #ededed;
