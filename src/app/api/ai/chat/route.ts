@@ -1,5 +1,7 @@
-// In-editor AI chat for a Service.
-//   GET -> { model } (the configured model, or null when AI isn't set up)
+// In-editor AI chat for a Service. The chat is saved per Service and shared by everyone with access.
+//   GET ?serviceId= -> { model, messages } (model: the configured one, or null when AI isn't set up;
+//                       messages: the saved chat, oldest first)
+//   DELETE ?serviceId= -> { ok } clears the saved chat for everyone
 //   POST { serviceId, messages, code, rows, vars, effort } -> newline-delimited JSON events:
 //     { type: "attempt", model }   a model starts answering; drop any text streamed so far
 //     { type: "text", delta }      reply text as it's written
@@ -12,6 +14,7 @@
 // Signed-in owners and members only (the service is read with the user's client, so RLS applies).
 
 import { buildChatSystemPrompt, parseReply, validateDraw, withEditorState } from "@/lib/ai/chat";
+import { clearChat, loadChat, saveMessage } from "@/lib/ai/chat-history";
 import { EFFORTS, getLlmProvider, isBusyError, ProviderError, type ChatMessage, type Effort } from "@/lib/ai/providers";
 import type { DrawRow } from "@/lib/draw/ops";
 import { createClient } from "@/lib/supabase/server";
@@ -57,9 +60,31 @@ function errorMessage(e: unknown): string {
   return e instanceof ProviderError && e.status === 429 ? `The AI provider is rate limiting requests. ${message}` : message;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const provider = getLlmProvider();
-  return Response.json({ model: provider?.model ?? null }, { headers: { "Cache-Control": "no-store" } });
+  const serviceId = new URL(request.url).searchParams.get("serviceId");
+  let messages: Awaited<ReturnType<typeof loadChat>> = [];
+  if (serviceId) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
+    messages = await loadChat(supabase, serviceId, user.id);
+  }
+  return Response.json({ model: provider?.model ?? null, messages }, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function DELETE(request: Request) {
+  const serviceId = new URL(request.url).searchParams.get("serviceId");
+  if (!serviceId) return Response.json({ error: "serviceId is required" }, { status: 400 });
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
+  const error = await clearChat(supabase, serviceId);
+  return error ? Response.json({ error }, { status: 500 }) : Response.json({ ok: true });
 }
 
 export async function POST(request: Request) {
@@ -104,6 +129,8 @@ export async function POST(request: Request) {
     .slice(-MAX_MESSAGES)
     .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
   const latest = chat[chat.length - 1];
+  // Saved before the model runs, so the question stays in the shared chat even if the reply fails.
+  await saveMessage(supabase, { serviceId, role: "user", content: latest.content, authorEmail: user.email });
   latest.content = withEditorState(latest.content, {
     code,
     rows: rows as DrawRow[],
@@ -156,6 +183,14 @@ export async function POST(request: Request) {
         }
 
         if (!reply.text && reply.dataCode === undefined && !draw) reply = { ...reply, text: "(The model sent an empty reply. Try rephrasing.)" };
+        const dataChanged = reply.dataCode !== undefined && reply.dataCode.trim() !== code.trim();
+        const drawChanged = !!draw?.ok;
+        await saveMessage(supabase, {
+          serviceId,
+          role: "assistant",
+          content: reply.text,
+          changed: dataChanged || drawChanged ? { data: dataChanged, draw: drawChanged } : null,
+        });
         send({
           type: "done",
           text: reply.text,

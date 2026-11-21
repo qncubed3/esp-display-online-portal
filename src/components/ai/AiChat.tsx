@@ -14,7 +14,7 @@ const SUGGESTIONS = [
 // The AI assistant: the "AI" view of the Draw commands panel. Replies are applied to the editor straight away
 // (unsaved until Save & deploy); the latest change can be undone.
 export default function AiChat({ chat, headerActions }: { chat: AiChatState; /** Extra buttons in the header row. */ headerActions?: ReactNode }) {
-  const { entries, pending, send, undo, clear, model, effort, setEffort } = chat;
+  const { entries, pending, loaded, send, undo, clear, model, effort, setEffort } = chat;
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +50,9 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
           {entries.length > 0 && (
             <button
               type="button"
-              onClick={clear}
+              onClick={() => {
+                if (confirm("Clear this chat for everyone with access to this service?")) void clear();
+              }}
               disabled={pending}
               className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-muted outline-none transition-colors hover:text-fg focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-50"
             >
@@ -62,11 +64,18 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
       </div>
 
       <div ref={listRef} className="max-h-[26rem] min-h-0 flex-1 space-y-3 overflow-y-auto xl:max-h-none px-3 py-3" aria-live="polite">
-        {entries.length === 0 && (
+        {!loaded && entries.length === 0 && (
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+            <Loader2 size={13} className="animate-spin" aria-hidden /> Loading chat…
+          </p>
+        )}
+
+        {loaded && entries.length === 0 && (
           <div className="space-y-2.5">
             <p className="text-[12px] text-muted">
               Describe the screen you want. The assistant can rewrite both the Data code and the Draw ops; changes land in the
-              editor unsaved, so check the preview, then Save &amp; deploy.
+              editor unsaved, so check the preview, then Save &amp; deploy. This chat is saved and shared with everyone who
+              has access to this service.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {SUGGESTIONS.map((s) => (
@@ -90,7 +99,8 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
               <span className="min-w-0 break-words">{e.error}</span>
             </p>
           ) : e.role === "user" ? (
-            <div key={i} className="flex justify-end">
+            <div key={i} className="flex flex-col items-end gap-0.5">
+              {e.author && <span className="max-w-[85%] truncate text-[11px] text-muted">{e.author}</span>}
               <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-md bg-panel-hover px-2.5 py-1.5 text-[13px]">{e.content}</p>
             </div>
           ) : (

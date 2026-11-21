@@ -35,7 +35,17 @@ export interface ChatEntry {
   /** The reply is still arriving; `progress` says what's being written. */
   streaming?: boolean;
   progress?: string;
+  /** Who sent a user message, when it was someone else (the chat is shared per Service). */
+  author?: string | null;
 }
+
+type SavedMessage = {
+  role: "user" | "assistant";
+  content: string;
+  changed: { data: boolean; draw: boolean } | null;
+  author: string | null;
+  mine: boolean;
+};
 
 type Done = { text?: string; dataCode?: string; wire?: RawWireOp[]; drawError?: string; model?: string };
 type ServerEvent =
@@ -62,7 +72,9 @@ function streamPreview(raw: string): { text: string; progress?: string } {
 }
 
 // Chat state and the request loop. Lives in the editor (not the Draw tab) so the conversation
-// survives tab switches. `getState` reads the editor's latest state; `apply` writes changes into it.
+// survives tab switches. The chat is saved on the server per Service and shared by everyone with
+// access; it loads when the editor opens. Undo only covers replies applied in this session.
+// `getState` reads the editor's latest state; `apply` writes changes into it.
 export function useAiChat({
   serviceId,
   getState,
@@ -76,6 +88,7 @@ export function useAiChat({
   const [pending, setPending] = useState(false);
   /** The configured model, then whichever model answered last (a fallback shows here). */
   const [model, setModel] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [effort, setEffortState] = useState<Effort>("off");
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
@@ -87,11 +100,22 @@ export function useAiChat({
     } catch {
       // Storage unavailable: keep the default.
     }
-    fetch("/api/ai/chat")
+    fetch(`/api/ai/chat?serviceId=${encodeURIComponent(serviceId)}`)
       .then((r) => r.json())
-      .then((b: { model?: string | null }) => setModel((m) => m ?? b.model ?? null))
-      .catch(() => {});
-  }, []);
+      .then((b: { model?: string | null; messages?: SavedMessage[] }) => {
+        setModel((m) => m ?? b.model ?? null);
+        const saved: ChatEntry[] = (b.messages ?? []).map((m) => ({
+          role: m.role,
+          content: m.content,
+          changed: m.changed ?? undefined,
+          author: m.mine ? null : m.author,
+        }));
+        // Don't replace a conversation already started in this session.
+        if (saved.length) setEntries((prev) => (prev.length ? prev : saved));
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, [serviceId]);
 
   const setEffort = useCallback((value: Effort) => {
     setEffortState(value);
@@ -213,9 +237,18 @@ export function useAiChat({
     [apply],
   );
 
-  const clear = useCallback(() => setEntries([]), []);
+  // Clears the saved chat for everyone with access to the Service.
+  const clear = useCallback(async () => {
+    const res = await fetch(`/api/ai/chat?serviceId=${encodeURIComponent(serviceId)}`, { method: "DELETE" }).catch(() => null);
+    const body = (await res?.json().catch(() => ({}))) as { error?: string } | undefined;
+    if (!res?.ok) {
+      setEntries((prev) => [...prev, { role: "assistant", content: "", error: body?.error ?? "Could not clear the chat." }]);
+      return;
+    }
+    setEntries([]);
+  }, [serviceId]);
 
-  return { entries, pending, send, undo, clear, model, effort, setEffort };
+  return { entries, pending, loaded, send, undo, clear, model, effort, setEffort };
 }
 
 export type AiChatState = ReturnType<typeof useAiChat>;
