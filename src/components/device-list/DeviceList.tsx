@@ -12,7 +12,7 @@ import {
   NewKeyCallout,
   NextPollCountdown,
   PollFrequency,
-  ScreenFlipButton,
+  ScreenRotationButton,
   ServiceSelect,
 } from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
@@ -123,7 +123,7 @@ function DeviceInfoButton({ d, now }: { d: DeviceListRow; now: number }) {
               </span>
             )}
           </InfoRow>
-          <InfoRow label="Screen orientation">{d.rotation === 3 ? "Flipped 180°" : "Normal"}</InfoRow>
+          <InfoRow label="Screen orientation">{d.rotation === 3 ? "Rotated 180°" : "Normal"}</InfoRow>
           <InfoRow label="WiFi signal">
             {d.rssi != null ? (
               <span className="inline-flex items-center gap-2">
@@ -299,7 +299,7 @@ export default function DeviceList({
       {needUpdate > 0 && (
         <p className="mb-3 rounded-md border border-border bg-panel px-3 py-2 text-[13px] text-muted">
           {needUpdate === 1 ? "1 device needs" : `${needUpdate} devices need`} a firmware update to show everything on
-          its screen (rotated text, screen flipping). Click <span className="text-amber-300">Update firmware</span> next
+          its screen (rotated text, screen rotated 180°). Click <span className="text-amber-300">Update firmware</span> next
           to it for the setup files, then upload them again.
         </p>
       )}
@@ -426,7 +426,7 @@ export default function DeviceList({
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                     {busy === d.id && <Loader2 size={13} className="animate-spin text-muted" />}
-                    <ScreenFlipButton
+                    <ScreenRotationButton
                       key={d.rotation}
                       deviceId={d.id}
                       deviceName={d.name}

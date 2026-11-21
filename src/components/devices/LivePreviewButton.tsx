@@ -4,8 +4,8 @@
 // Nothing stores the frame a device was sent, so the screen is rebuilt here the same way the poll
 // endpoint (src/app/api/device/frame/route.ts) builds it: the Service's saved Draw ops filled with
 // the saved Data code's current variables (POST /api/preview with no `code`). Close enough, not exact.
-// Like the endpoint, a device on 1.x firmware is shown its v1 frame (rotated text unrotated, flip
-// ignored); a flipped device on 2.0+ is shown turned 180°, as someone facing it sees it.
+// Like the endpoint, a device on 1.x firmware is shown its v1 frame (rotated text unrotated, 180°
+// rotation ignored); a rotated device on 2.0+ is shown turned 180°, as someone facing it sees it.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MonitorPlay } from "lucide-react";
@@ -146,8 +146,8 @@ function LivePreview({ deviceId, deviceName, frameVersion }: { deviceId: string;
   }, [remainingS, offline, device, loadDevice, loadScreen]);
 
   const v1 = frameVersion !== null && frameVersion < 2;
-  const flipSet = device?.rotation === 3;
-  const flipShown = flipSet && frameVersion !== null && frameVersion >= FEATURES.screenFlip.minFrame;
+  const rotatedSet = device?.rotation === 3;
+  const rotatedShown = rotatedSet && frameVersion !== null && frameVersion >= FEATURES.screenRotation.minFrame;
 
   if (deviceError) {
     return <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-300">{deviceError}</p>;
@@ -202,7 +202,7 @@ function LivePreview({ deviceId, deviceName, frameVersion }: { deviceId: string;
           <DevicePreview
             ops={screen.kind === "none" ? noServiceOps(deviceName) : v1 ? toV1Ops(screen.ops) : screen.ops}
             scale={2}
-            flipped={flipShown}
+            rotated180={rotatedShown}
           />
           <p className="text-center text-[12px] text-[#6b6b6b]">
             {screen.kind === "none" ? (
@@ -214,11 +214,11 @@ function LivePreview({ deviceId, deviceName, frameVersion }: { deviceId: string;
                 {screen.kind === "dataError" && <span className="block text-red-300">Data error: {screen.error}</span>}
               </>
             )}
-            {flipShown && <span className="block">Shown turned 180°: this device&apos;s screen is flipped.</span>}
-            {flipSet && !flipShown && (
+            {rotatedShown && <span className="block">Shown turned 180°, the way this device shows it.</span>}
+            {rotatedSet && !rotatedShown && (
               <span className="block">
-                Screen flip is set, but {frameVersion === null ? "the device hasn't reported its firmware yet" : "this device's firmware ignores it"}; it
-                applies with {firmwareForFrame(FEATURES.screenFlip.minFrame)} or later.
+                Rotate 180° is set, but {frameVersion === null ? "the device hasn't reported its firmware yet" : "this device's firmware ignores it"}; it
+                applies with {firmwareForFrame(FEATURES.screenRotation.minFrame)} or later.
               </span>
             )}
           </p>

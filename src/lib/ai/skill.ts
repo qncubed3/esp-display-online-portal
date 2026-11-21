@@ -95,7 +95,7 @@ Rotation: ${rotatable} take an optional **last** arg \`angle\`, in degrees clock
 
 - Rotated shapes work on every device (the server turns them into triangles and lines; rounded corners at angles other than 90/180/270 become short straight segments).
 - Rotated **text needs firmware 2.0** on the device; devices on older firmware draw it unrotated, so keep it readable either way (don't let unrotated text overlap other things).
-- Flipping the **whole screen** 180 degrees (a display mounted upside down) is a per-device setting on the portal's Devices page, not something Draw ops can do. Always lay out for the normal ${W}x${H} landscape, never pre-rotate the design.
+- Rotating the **whole screen** 180 degrees (a display mounted upside down) is a per-device setting on the portal's Devices page, not something Draw ops can do. Always lay out for the normal ${W}x${H} landscape, never pre-rotate the design.
 
 Fonts (\`drawString\`'s last arg), size at text size 1 (multiply by \`setTextSize\`):
 

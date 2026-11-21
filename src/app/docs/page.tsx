@@ -275,7 +275,7 @@ export default function DocsPage() {
                 <B>Rotation</B>: shapes (lines, rectangles, rounded rectangles, triangles) and text take an optional last
                 arg, degrees clockwise about the item&apos;s centre. Rotated shapes work on every device; rotated text needs
                 firmware 2.0 (older devices draw it unrotated). Rotated items can be moved on the preview but not resized.
-                To turn a whole display upside down, flip it per device on the Devices page instead.
+                To turn a whole display upside down, use Rotate 180° on that device in the Devices page instead.
               </li>
             </List>
             <P>

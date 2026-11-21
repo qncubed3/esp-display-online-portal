@@ -21,7 +21,7 @@ export interface DeviceRow {
   created_at: string;
   /** Seconds between polls; missing until migration 006 has run. */
   poll_seconds?: number;
-  /** Screen orientation, 1 normal or 3 flipped 180°; missing until migration 011 has run. */
+  /** Screen orientation, 1 normal or 3 rotated 180°; missing until migration 011 has run. */
   rotation?: number;
 }
 
@@ -236,13 +236,13 @@ export async function setDevicePollSeconds(deviceId: string, seconds: number): P
 // Turns the device's screen 180° (3) or back to normal (1), for a display mounted upside down.
 // Firmware 2.0+ picks it up on its next poll; 1.x firmware ignores it until reflashed.
 export async function setDeviceRotation(deviceId: string, rotation: number): Promise<void> {
-  if (rotation !== 1 && rotation !== 3) throw new Error("Rotation must be 1 (normal) or 3 (flipped).");
+  if (rotation !== 1 && rotation !== 3) throw new Error("Rotation must be 1 (normal) or 3 (rotated 180°).");
   try {
     await updateOwnDevice(deviceId, { rotation });
   } catch (e) {
     // Before migration 011 the column doesn't exist.
     if (e instanceof Error && /rotation/.test(e.message) && /column/i.test(e.message)) {
-      throw new Error("Screen flipping needs database migration 011 (supabase/migrations/011_device_rotation.sql).");
+      throw new Error("Rotating the screen needs database migration 011 (supabase/migrations/011_device_rotation.sql).");
     }
     throw e;
   }

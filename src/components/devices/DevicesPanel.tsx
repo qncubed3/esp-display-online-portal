@@ -30,7 +30,7 @@ import {
   NewKeyCallout,
   NextPollCountdown,
   PollFrequency,
-  ScreenFlipButton,
+  ScreenRotationButton,
   ServiceSelect,
   pollLabel,
 } from "./DeviceControls";
@@ -329,7 +329,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                     {d.mine && (
                       <div className="flex items-center justify-end gap-1">
                         {busy === d.id && <Loader2 size={13} className="animate-spin text-[#a0a0a0]" />}
-                        <ScreenFlipButton
+                        <ScreenRotationButton
                           key={d.rotation ?? 1}
                           deviceId={d.id}
                           deviceName={d.name}

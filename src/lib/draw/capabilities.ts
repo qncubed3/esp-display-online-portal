@@ -8,17 +8,17 @@ import { ANGLE_KEY, OP_BY_NAME, fill, hasAngle, type DrawRow, type WireOp } from
 import { TEXT_ROT_OP, normalizeAngle } from "./rotate";
 import { deviceFrameVersion, firmwareForFrame } from "@/lib/firmware/version";
 
-export type Feature = "rotatedText" | "screenFlip";
+export type Feature = "rotatedText" | "screenRotation";
 
 export const FEATURES: Record<Feature, { minFrame: number; label: string; degraded: string }> = {
   rotatedText: { minFrame: 2, label: "rotated text", degraded: "rotated text shows unrotated" },
-  screenFlip: { minFrame: 2, label: "screen flipping", degraded: "the screen flip won't apply" },
+  screenRotation: { minFrame: 2, label: "rotating the screen 180°", degraded: "the 180° screen rotation won't apply" },
 };
 
-const ORDER: Feature[] = ["rotatedText", "screenFlip"];
+const ORDER: Feature[] = ["rotatedText", "screenRotation"];
 
 export interface FeatureInput {
-  /** The device's orientation setting (devices.rotation): 1 normal, 3 flipped. */
+  /** The device's orientation setting (devices.rotation): 1 normal, 3 rotated 180°. */
   rotation?: number | null;
   /** The Service's saved Draw rows; a {var} rotation counts as used unless `vars` says it's 0. */
   rows?: DrawRow[] | null;
@@ -33,7 +33,7 @@ export interface FeatureInput {
 /** The features a device's screen uses that need a frame schema newer than v1. Empty when v1 draws it all. */
 export function featuresNeeded({ rotation, rows, vars, ops, uses }: FeatureInput): Feature[] {
   const found = new Set<Feature>(uses ?? []);
-  if (rotation === 3) found.add("screenFlip");
+  if (rotation === 3) found.add("screenRotation");
   if (ops) {
     if (ops.some((op) => Array.isArray(op) && op[0] === TEXT_ROT_OP)) found.add("rotatedText");
   } else if (Array.isArray(rows)) {
@@ -56,7 +56,7 @@ export function missingFeatures(needed: Feature[], frameVersion: number | null):
   return needed.filter((f) => FEATURES[f].minFrame > frameVersion);
 }
 
-/** "Rotated text shows unrotated and the screen flip won't apply until you reflash with EspDisplay 2.0.0." */
+/** "Rotated text shows unrotated and the 180° screen rotation won't apply until you reflash with EspDisplay 2.0.0." */
 export function missingSentence(missing: Feature[]): string {
   if (!missing.length) return "";
   const parts = missing.map((f) => FEATURES[f].degraded);

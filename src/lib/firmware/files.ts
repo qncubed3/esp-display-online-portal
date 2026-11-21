@@ -380,12 +380,12 @@ This is **${FW_VERSION}**. The device reports its version to the portal (Devices
 details), and the portal flags a device whose screen uses something its firmware
 can't draw yet.
 
-- **2.0.0**: rotated text, and flipping the screen 180 degrees (set per device on the
+- **2.0.0**: rotated text, and rotating the whole screen 180 degrees (set per device on the
   portal's Devices page, for a display mounted upside down). The orientation is
   remembered across restarts.
 - Devices still on **1.x** keep working with no changes: they get the same frames as
   before. Rotated shapes draw the same on them; rotated text is drawn unrotated and the
-  screen flip setting is ignored until the device is reflashed with these files.
+  180-degree screen rotation is ignored until the device is reflashed with these files.
   To update, download the setup files again and upload them (same steps as above;
   your \`config.h\` can be kept).
 `;

@@ -9,8 +9,8 @@ export interface DeviceListRow {
   serviceName: string | null; // null when unsubscribed, or the Service is no longer accessible
   shared: boolean; // Service owned by someone else
   pollSeconds: number;
-  rotation: 1 | 3; // screen orientation: 1 normal, 3 flipped 180° (1 until migration 011)
-  /** What its Service's screen uses that needs newer firmware; the flip is added from `rotation`. */
+  rotation: 1 | 3; // screen orientation: 1 normal, 3 rotated 180° (1 until migration 011)
+  /** What its Service's screen uses that needs newer firmware; the 180° rotation is added from `rotation`. */
   contentNeeds: Feature[];
   lastSeenAt: string | null;
   online: boolean; // seen in the last 2 minutes

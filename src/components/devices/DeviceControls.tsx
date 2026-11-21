@@ -3,7 +3,7 @@
 // Device controls shared by the /devices page and a Service's Devices tab.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Copy, FileCode2, FlipVertical2, Loader2, X } from "lucide-react";
+import { AlertCircle, Check, Copy, FileCode2, RotateCw, Loader2, X } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import { setDevicePollSeconds, setDeviceRotation, setDeviceService, type SubscribableService } from "@/lib/devices/actions";
 import { FEATURES, missingSentence, type Feature } from "@/lib/draw/capabilities";
@@ -365,10 +365,11 @@ export function AddDeviceForm({
   );
 }
 
-// Flips the device's screen 180° (for a display mounted upside down) or back. The state shows in
-// the icon (turned and green when flipped). Firmware older than 2.0 ignores the setting: it's
+// Rotates the device's whole screen 180° (for a display mounted upside down) or back. Not a mirror:
+// text stays readable. The state shows in the icon (green when rotated). Firmware older than 2.0
+// ignores the setting: it's
 // saved anyway and applies once the device is reflashed, and the tooltip says so.
-export function ScreenFlipButton({
+export function ScreenRotationButton({
   deviceId,
   deviceName,
   rotation,
@@ -384,18 +385,18 @@ export function ScreenFlipButton({
   frameVersion: number | null;
   onChanged?: (rotation: 1 | 3) => void;
   className?: string;
-  /** Show "Flip"/"Flipped" next to the icon. */
+  /** Show "Rotate 180°"/"Rotated 180°" next to the icon. */
   label?: boolean;
 }) {
   const [value, setValue] = useState(rotation);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null); // callers key it by `rotation` to resync
 
-  const flipped = value === 3;
-  const need = FEATURES.screenFlip.minFrame;
+  const rotated = value === 3;
+  const need = FEATURES.screenRotation.minFrame;
   const unsupported = frameVersion !== null && frameVersion < need;
   const title = [
-    flipped ? "Screen orientation: flipped 180° — click to set back to normal" : "Screen orientation: normal — click to flip 180°",
+    rotated ? "Screen rotated 180° — click to set back to normal" : "Screen orientation: normal — click to rotate 180° (for a display mounted upside down)",
     unsupported
       ? `This device runs older firmware: the setting is saved, but only applies after you reflash it with ${firmwareForFrame(need)}.`
       : frameVersion === null
@@ -407,7 +408,7 @@ export function ScreenFlipButton({
     .join("\n");
 
   async function toggle() {
-    const next: 1 | 3 = flipped ? 1 : 3;
+    const next: 1 | 3 = rotated ? 1 : 3;
     setValue(next);
     setSaving(true);
     setError(null);
@@ -428,24 +429,24 @@ export function ScreenFlipButton({
       onClick={() => void toggle()}
       disabled={saving}
       title={title}
-      aria-label={`${flipped ? "Unflip" : "Flip"} the screen of ${deviceName}`}
-      aria-pressed={flipped}
+      aria-label={`Rotate the screen of ${deviceName} 180°`}
+      aria-pressed={rotated}
       className={`${className ?? ""} inline-flex items-center gap-1 whitespace-nowrap ${
-        error ? "text-[#ff8a8e]" : flipped ? (unsupported ? "text-amber-300" : "text-[#3ecf8e]") : ""
+        error ? "text-[#ff8a8e]" : rotated ? (unsupported ? "text-amber-300" : "text-[#3ecf8e]") : ""
       }`}
     >
       {saving ? (
         <Loader2 size={13} className="animate-spin" />
       ) : (
-        <FlipVertical2 size={13} className={flipped ? "rotate-180 transition-transform" : "transition-transform"} />
+        <RotateCw size={13} className={rotated ? "rotate-180 transition-transform" : "transition-transform"} />
       )}
-      {label && (flipped ? "Flipped" : "Flip")}
+      {label && (rotated ? "Rotated 180°" : "Rotate 180°")}
     </button>
   );
 }
 
 // Amber "Update firmware" pill for a device whose screen uses something its firmware can't draw
-// (rotated text, the screen flip). Nothing for devices that need nothing new, however old.
+// (rotated text, the screen rotated 180°). Nothing for devices that need nothing new, however old.
 export function FirmwareUpdateBadge({ fw, missing, onClick }: { fw: string | null; missing: Feature[]; onClick?: () => void }) {
   if (!missing.length) return null;
   const title = `Running ${fw ?? "older firmware"}. ${missingSentence(missing)} Click for the setup files, then upload them again.`;
