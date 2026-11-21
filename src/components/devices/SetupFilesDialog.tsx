@@ -1,10 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Check, Copy, Download, FileCode2, FileText, Info, Lock, Wifi } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { buildFirmwareFiles, firmwareZipName } from "@/lib/firmware/files";
 import { zipFirmwareFiles } from "@/lib/firmware/zip";
+
+// CodeMirror only in the browser, and only once the dialog opens.
+const CodeEditor = dynamic(() => import("@/components/data/CodeEditor"), {
+  ssr: false,
+  loading: () => <div className="min-h-[200px]" />,
+});
+
+const languageFor = (path: string) => (path.endsWith(".md") ? "markdown" : "cpp");
 
 function CopyFileButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -222,9 +231,9 @@ export default function SetupFilesDialog({
               <span className="truncate font-mono text-[12px] text-[#a0a0a0]">{file.path}</span>
               <CopyFileButton text={file.content} />
             </div>
-            <pre className="max-h-[50vh] overflow-auto p-3 font-mono text-[12px] leading-relaxed text-[#ededed]">
-              {file.content}
-            </pre>
+            <div className="max-h-[50vh] overflow-auto">
+              <CodeEditor key={file.path} value={file.content} language={languageFor(file.path)} readOnly />
+            </div>
           </div>
         </div>
       </div>

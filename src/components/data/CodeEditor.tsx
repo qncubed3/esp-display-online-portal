@@ -1,8 +1,10 @@
 "use client";
 
 import CodeMirror from "@uiw/react-codemirror";
+import { cpp } from "@codemirror/lang-cpp";
 import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
+import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, indentUnit, syntaxHighlighting } from "@codemirror/language";
 import { Decoration, EditorView, MatchDecorator, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
@@ -75,6 +77,12 @@ const highlight = HighlightStyle.define([
   { tag: [t.self, t.special(t.variableName)], color: c.keyword, fontStyle: "italic" },
   { tag: [t.operator, t.punctuation, t.separator, t.bracket], color: c.muted },
   { tag: t.typeName, color: c.number },
+  { tag: [t.processingInstruction, t.macroName], color: c.module }, // C++: #include, #define
+  { tag: t.heading, color: c.fn, fontWeight: "600" }, // Markdown
+  { tag: t.strong, fontWeight: "600" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: [t.link, t.url], color: c.prop },
+  { tag: t.monospace, color: c.string },
   { tag: t.invalid, color: c.regexp },
 ]);
 
@@ -100,6 +108,8 @@ const shared = [indentUnit.of("  "), syntaxHighlighting(highlight), theme];
 const extensionsFor = {
   javascript: [javascript(), builtins, ...shared],
   json: [json(), ...shared],
+  cpp: [cpp(), ...shared],
+  markdown: [markdown(), ...shared],
 };
 
 export type CodeLanguage = keyof typeof extensionsFor;
@@ -109,11 +119,14 @@ export default function CodeEditor({
   onChange,
   placeholder,
   language = "javascript",
+  readOnly = false,
 }: {
   value: string;
-  onChange(v: string): void;
+  onChange?(v: string): void;
   placeholder?: string;
   language?: CodeLanguage;
+  /** Highlighted and selectable, not editable (e.g. the firmware files viewer). */
+  readOnly?: boolean;
 }) {
   return (
     <CodeMirror
@@ -122,7 +135,9 @@ export default function CodeEditor({
       placeholder={placeholder}
       theme="none"
       extensions={extensionsFor[language]}
-      indentWithTab
+      editable={!readOnly}
+      readOnly={readOnly}
+      indentWithTab={!readOnly}
       basicSetup={{
         tabSize: 2,
         lineNumbers: true,
@@ -130,8 +145,8 @@ export default function CodeEditor({
         closeBrackets: true,
         foldGutter: false,
         autocompletion: false,
-        highlightActiveLine: true,
-        highlightActiveLineGutter: true,
+        highlightActiveLine: !readOnly,
+        highlightActiveLineGutter: !readOnly,
         syntaxHighlighting: false, // replaced by our own style above
       }}
     />
