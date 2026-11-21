@@ -17,6 +17,7 @@ import LoadTemplateDialog, { type LoadMode } from "@/components/templates/LoadTe
 import { Button } from "@/components/ui/Button";
 import { buildAiSkill, buildDrawSkill } from "@/lib/ai/skill";
 import type { DrawRow } from "@/lib/draw/ops";
+import { patchService } from "@/lib/store/cache";
 import type { Template } from "@/lib/templates/catalog";
 
 type Vars = Record<string, string | number | boolean>;
@@ -171,6 +172,7 @@ export default function ServiceEditor({
     startSave(async () => {
       try {
         await saveService(serviceId, { data_code: snapshot.code, draw_ops: snapshot.rows });
+        patchService(serviceId, { draw_ops: snapshot.rows }); // the My Services card redraws
         setSaved({ code: snapshot.code, rows: JSON.stringify(snapshot.rows) });
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : "Save failed.");

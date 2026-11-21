@@ -2,16 +2,8 @@ import { Cpu } from "lucide-react";
 import ServiceLink from "@/components/services/ServiceLink";
 import LeaveServiceButton from "@/components/sharing/LeaveServiceButton";
 import { Badge } from "@/components/ui/Badge";
+import type { SharedService } from "@/lib/lists/types";
 import { timeAgo } from "@/lib/time";
-
-export interface SharedService {
-  id: string;
-  name: string;
-  enabled: boolean;
-  deviceCount: number;
-  addedAt: string;
-  isNew: boolean;
-}
 
 // A Service someone shared with you. The whole box links to the Service; the Leave
 // button sits above the link overlay so it stays clickable (no nested interactive elements).

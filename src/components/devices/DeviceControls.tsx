@@ -162,7 +162,15 @@ export function pollLabel(seconds: number): string {
 }
 
 // Per-device dropdown. Saves as soon as it changes; the device picks it up on its next poll.
-export function PollFrequency({ deviceId, initial }: { deviceId: string; initial: number }) {
+export function PollFrequency({
+  deviceId,
+  initial,
+  onChanged,
+}: {
+  deviceId: string;
+  initial: number;
+  onChanged?: (seconds: number) => void;
+}) {
   const [value, setValue] = useState(initial);
   const [state, setState] = useState<SaveState>("idle");
   const options = POLL_OPTIONS.some((o) => o.value === value) ? POLL_OPTIONS : [...POLL_OPTIONS, { value, label: pollLabel(value) }];
@@ -174,6 +182,7 @@ export function PollFrequency({ deviceId, initial }: { deviceId: string; initial
     try {
       await setDevicePollSeconds(deviceId, next);
       setState("saved");
+      onChanged?.(next);
     } catch {
       setValue(prev);
       setState("error");

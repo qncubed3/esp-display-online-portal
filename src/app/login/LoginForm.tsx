@@ -1,15 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
+import { clearCache } from "@/lib/store/cache";
 import { signIn, type SignInState } from "./actions";
 
 const initial: SignInState = { error: null, email: "" };
 
 export default function LoginForm() {
   const [state, action, pending] = useActionState(signIn, initial);
+
+  // Signed out (from the sidebar, everywhere, or an expired session): drop the last user's cached lists.
+  useEffect(() => clearCache(), []);
 
   return (
     <form action={action} className="space-y-4">

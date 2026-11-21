@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
-import { ChevronRight, LogOut, Monitor } from "lucide-react";
-import { signOut } from "@/app/auth/actions";
+import { ChevronRight, Monitor } from "lucide-react";
+import CacheWarmer from "@/components/layout/CacheWarmer";
 import MobileNav from "@/components/layout/MobileNav";
 import SidebarNav from "@/components/layout/SidebarNav";
+import SignOutButton from "@/components/layout/SignOutButton";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/server";
@@ -51,21 +52,14 @@ export default function AppShell({
         <Suspense fallback={<Skeleton className="mb-3 mt-1 w-32" />}>
           <SignedInEmail />
         </Suspense>
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] text-muted transition-colors hover:bg-panel-hover hover:text-fg"
-          >
-            <LogOut size={14} />
-            Sign out
-          </button>
-        </form>
+        <SignOutButton />
       </div>
     </>
   );
 
   return (
     <div className="flex h-full w-full overflow-hidden">
+      <CacheWarmer />
       <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-panel md:flex">{sidebar}</aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

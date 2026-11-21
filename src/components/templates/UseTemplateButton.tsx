@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label } from "@/components/ui/Input";
 import { createServiceFromTemplate } from "@/lib/templates/actions";
+import { invalidateLists, isRedirect } from "@/lib/store/cache";
 
 export default function UseTemplateButton({ templateId, templateName }: { templateId: string; templateName: string }) {
   const [open, setOpen] = useState(false);
@@ -24,7 +25,14 @@ export default function UseTemplateButton({ templateId, templateName }: { templa
     setError(null);
     startTransition(async () => {
       // On success the action redirects to the new service page.
-      const res = await createServiceFromTemplate(templateId, name);
+      let res: { error: string } | undefined;
+      try {
+        res = await createServiceFromTemplate(templateId, name);
+      } catch (e) {
+        // Created: the Service lists don't have it yet.
+        if (isRedirect(e)) invalidateLists("services", "subscribable");
+        throw e;
+      }
       if (res?.error) setError(res.error);
     });
   }

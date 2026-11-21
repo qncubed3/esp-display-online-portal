@@ -7,6 +7,13 @@ export function Skeleton({ className }: { className?: string }) {
   return <span aria-hidden className={cn("skeleton block h-3", className)} />;
 }
 
+// How many placeholder items to show for a list that had `last` items last time: the same number
+// (capped), one when it was empty (the empty state replaces it), three when it's never been seen.
+export function skeletonCount(last: number | undefined, max = 12): number {
+  if (last === undefined) return 3;
+  return Math.min(Math.max(last, 1), max);
+}
+
 // Placeholder for a grid of Service-style cards (dashboard, Shared with me). `preview` adds the
 // screen preview area the dashboard cards have.
 export function CardGridSkeleton({ count = 3, preview = false }: { count?: number; preview?: boolean }) {

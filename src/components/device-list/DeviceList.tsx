@@ -1,7 +1,6 @@
 "use client";
 
 import ServiceLink from "@/components/services/ServiceLink";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Cpu, ExternalLink, FileCode2, Info, KeyRound, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import LivePreviewButton from "@/components/devices/LivePreviewButton";
@@ -15,6 +14,7 @@ import { InlineRename } from "@/components/ui/InlineRename";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/components/ui/cn";
 import { addDevice, deleteDevice, regenerateDeviceKey, renameDevice, type SubscribableService } from "@/lib/devices/actions";
+import { devicesChanged, patchDevice, refreshLists } from "@/lib/store/cache";
 import { timeAgo } from "@/lib/time";
 import { formatBytes, formatUptime, signalBars, type DeviceListRow } from "@/lib/device-list/types";
 
@@ -129,6 +129,7 @@ function StatusBadge({ status, error }: { status: number; error: string | null }
 
 // The signed-in user's devices: add them, choose the Service each one shows, poll frequency, keys.
 // Changing the Service needs no reflashing; the device gets the new screen on its next poll.
+// Changes are patched into the client cache (src/lib/store/cache.ts), which then refetches.
 export default function DeviceList({
   devices,
   services,
@@ -138,7 +139,6 @@ export default function DeviceList({
   services: SubscribableService[];
   now: number;
 }) {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [adding, setAdding] = useState(false);
@@ -180,7 +180,7 @@ export default function DeviceList({
     if (res) {
       setShownKey({ name, key: res.key });
       setAdding(false);
-      router.refresh();
+      devicesChanged();
     }
   }
 
@@ -192,8 +192,10 @@ export default function DeviceList({
 
   async function onDelete(d: DeviceListRow) {
     if (!confirm(`Delete device "${d.name}"? It will no longer be able to fetch frames.`)) return;
-    await run(d.id, () => deleteDevice(d.id));
-    router.refresh();
+    await run(d.id, async () => {
+      await deleteDevice(d.id);
+      patchDevice(d.id, null);
+    });
   }
 
   // Add form, one-time key and errors, above the table (or the empty state).
@@ -331,7 +333,7 @@ export default function DeviceList({
                       className="max-w-[14rem] font-medium"
                       onSave={async (name) => {
                         await renameDevice(d.id, name);
-                        router.refresh();
+                        patchDevice(d.id, { name });
                       }}
                     />
                   </span>
@@ -343,7 +345,10 @@ export default function DeviceList({
                       deviceId={d.id}
                       initial={d.serviceId}
                       services={services}
-                      onChanged={() => router.refresh()}
+                      onChanged={(serviceId) => {
+                        const svc = services.find((s) => s.id === serviceId);
+                        patchDevice(d.id, { serviceId, serviceName: svc?.name ?? null, shared: !!svc?.shared });
+                      }}
                     />
                     {d.serviceId && d.serviceName ? (
                       <ServiceLink
@@ -361,7 +366,12 @@ export default function DeviceList({
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-1.5">
-                  <PollFrequency key={d.pollSeconds} deviceId={d.id} initial={d.pollSeconds} />
+                  <PollFrequency
+                    key={d.pollSeconds}
+                    deviceId={d.id}
+                    initial={d.pollSeconds}
+                    onChanged={(pollSeconds) => patchDevice(d.id, { pollSeconds })}
+                  />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-muted">
                   {d.lastSeenAt ? (
@@ -371,7 +381,7 @@ export default function DeviceList({
                   )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5">
-                  <NextPollCountdown lastSeenAt={d.lastSeenAt} pollSeconds={d.pollSeconds} onDue={() => router.refresh()} />
+                  <NextPollCountdown lastSeenAt={d.lastSeenAt} pollSeconds={d.pollSeconds} onDue={() => refreshLists("devices")} />
                 </td>
                 <td className="px-4 py-2.5">
                   {d.lastStatus != null ? <StatusBadge status={d.lastStatus} error={d.lastError} /> : dash}
@@ -407,7 +417,7 @@ export default function DeviceList({
                       className={iconButton}
                       onDone={(message) => {
                         setNotice(message);
-                        router.refresh();
+                        patchDevice(d.id, null);
                       }}
                     />
                     <button

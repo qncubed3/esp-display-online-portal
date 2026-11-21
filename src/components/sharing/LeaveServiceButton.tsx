@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import { leaveService } from "@/lib/sharing/actions";
+import { invalidateLists, isRedirect } from "@/lib/store/cache";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -16,8 +17,13 @@ export default function LeaveServiceButton({ serviceId, name }: { serviceId: str
     setError(null);
     startTransition(async () => {
       try {
-        await leaveService(serviceId); // redirects to / on success
+        await leaveService(serviceId); // redirects to /shared on success
       } catch (e) {
+        if (isRedirect(e)) {
+          // Left. Devices of yours on it may have lost their Service too.
+          invalidateLists("shared", "subscribable", "devices");
+          return;
+        }
         setError(e instanceof Error ? e.message : "Could not leave.");
       }
     });

@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { createService } from "@/app/actions";
+import { invalidateLists, isRedirect } from "@/lib/store/cache";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label } from "@/components/ui/Input";
@@ -24,7 +25,14 @@ export default function NewServiceButton({ size = "sm" }: { size?: "sm" | "md" }
     setError(null);
     startTransition(async () => {
       // On success the action redirects to the new service page.
-      const res = await createService(name);
+      let res: { error: string } | undefined;
+      try {
+        res = await createService(name);
+      } catch (e) {
+        // Created: the Service lists don't have it yet.
+        if (isRedirect(e)) invalidateLists("services", "subscribable");
+        throw e;
+      }
       if (res?.error) setError(res.error);
     });
   }

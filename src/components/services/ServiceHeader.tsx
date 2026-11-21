@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Toggle } from "@/components/ui/Toggle";
 import LeaveServiceButton from "@/components/sharing/LeaveServiceButton";
 import ShareButton from "@/components/sharing/ShareButton";
+import { invalidateLists, isRedirect, patchService } from "@/lib/store/cache";
 
 export default function ServiceHeader({
   serviceId,
@@ -52,13 +53,20 @@ export default function ServiceHeader({
     }
     run(async () => {
       await updateService(serviceId, { name: next });
+      patchService(serviceId, { name: next });
       setEditing(false);
     });
   }
 
   function toggle(next: boolean) {
     setIsEnabled(next);
-    run(() => updateService(serviceId, { enabled: next }), () => setIsEnabled(!next));
+    run(
+      async () => {
+        await updateService(serviceId, { enabled: next });
+        patchService(serviceId, { enabled: next });
+      },
+      () => setIsEnabled(!next),
+    );
   }
 
   function remove() {
@@ -67,6 +75,11 @@ export default function ServiceHeader({
       try {
         await deleteService(serviceId); // redirects to / on success
       } catch (e) {
+        if (isRedirect(e)) {
+          // Deleted. Devices that were on it are unsubscribed now.
+          invalidateLists("services", "subscribable", "devices");
+          return;
+        }
         setError(e instanceof Error ? e.message : "Delete failed.");
         setConfirmDelete(false);
       }

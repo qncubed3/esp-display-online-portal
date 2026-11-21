@@ -23,6 +23,7 @@ import { InlineRename } from "@/components/ui/InlineRename";
 import { Select } from "@/components/ui/Select";
 import LivePreviewButton from "./LivePreviewButton";
 import SetupFilesDialog from "./SetupFilesDialog";
+import { devicesChanged, refreshLists } from "@/lib/store/cache";
 import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, ServiceSelect, pollLabel } from "./DeviceControls";
 
 const ONLINE_MS = 2 * 60 * 1000;
@@ -117,6 +118,12 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
     }
   }, [serviceId]);
 
+  // After a change here: reload this panel, and refresh the cached lists on /devices and the Service tabs.
+  const changed = useCallback(async () => {
+    devicesChanged();
+    await load();
+  }, [load]);
+
   useEffect(() => {
     const first = setTimeout(load, 0);
     const poll = setInterval(load, 30_000);
@@ -145,13 +152,13 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
     if (res) {
       setShownKey({ name, key: res.key });
       setAdding(false);
-      await load();
+      await changed();
     }
   }
 
   async function onMove(d: MyDeviceRow) {
     await run("move", () => setDeviceService(d.id, serviceId));
-    await load();
+    await changed();
   }
 
   async function onRegenerate(d: ServiceDeviceRow) {
@@ -163,7 +170,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
   async function onDelete(d: ServiceDeviceRow) {
     if (!confirm(`Delete device "${d.name}"? It will no longer be able to fetch frames.`)) return;
     await run(d.id, () => deleteDevice(d.id));
-    await load();
+    await changed();
   }
 
   const movable = mine.filter((d) => d.service_id !== serviceId);
@@ -257,7 +264,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                           label={`Rename ${d.name}`}
                           onSave={async (name) => {
                             await renameDevice(d.id, name);
-                            await load();
+                            await changed();
                           }}
                         />
                       ) : (
@@ -287,7 +294,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                         deviceId={d.id}
                         initial={d.service_id}
                         services={services}
-                        onChanged={() => void load()}
+                        onChanged={() => void changed()}
                       />
                     ) : (
                       <span className="text-[#a0a0a0]">This service</span>
@@ -295,7 +302,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5">
                     {d.mine ? (
-                      <PollFrequency deviceId={d.id} initial={d.poll_seconds ?? 30} />
+                      <PollFrequency deviceId={d.id} initial={d.poll_seconds ?? 30} onChanged={() => refreshLists("devices")} />
                     ) : (
                       <span className="text-[#a0a0a0]">{pollLabel(d.poll_seconds ?? 30)}</span>
                     )}
