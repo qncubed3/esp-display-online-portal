@@ -379,7 +379,7 @@ function DeviceTable({ devices }: { devices: ServiceActivity["devices"] }) {
               <th className={cn(th, "text-right")}>RSSI</th>
               <th className={cn(th, "text-right")}>Free heap</th>
               <th className={cn(th, "text-right")}>Uptime</th>
-              <th className={th}>Firmware</th>
+              <th className={th}>Draw engine</th>
             </tr>
           </thead>
           <tbody>

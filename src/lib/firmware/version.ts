@@ -1,8 +1,10 @@
 // The firmware version the portal generates, and what a device's reported X-FW says it can draw.
 // Client-safe (no firmware templates), so the device pages can use it.
 //
-// Firmware versions are plain numbers: v1, v2, ... The generated firmware sends "EspDisplay/v2";
-// devices flashed before that send semver ("EspDisplay/1.1.0"), and only the major number counts.
+// The UI calls this version the "draw engine" (v1, v2, ...): what the sketch on the device can draw,
+// as opposed to the ESP32's own firmware. Versions are plain numbers. The generated sketch sends
+// "EspDisplay/v2"; devices flashed before that send semver ("EspDisplay/1.1.0"), and only the major
+// number counts.
 // Bumping firmware only changes FW_MAJOR here (and FRAME_VERSIONS if it reads a newer frame schema).
 
 export const FW_NAME = "EspDisplay";
@@ -51,8 +53,8 @@ export function deviceFrameVersion(fw: string | null | undefined, hasPolled: boo
   return FRAME_VERSIONS.find((f) => v >= f.since)?.frame ?? 1;
 }
 
-/** The firmware that first reads frame schema `frame`, e.g. "firmware v2". */
+/** The draw engine version that first reads frame schema `frame`, e.g. "draw engine v2". */
 export function firmwareForFrame(frame: number): string {
   const since = FRAME_VERSIONS.find((f) => f.frame === frame)?.since ?? FW_MAJOR;
-  return `firmware v${since}`;
+  return `draw engine v${since}`;
 }

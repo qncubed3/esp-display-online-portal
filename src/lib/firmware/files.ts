@@ -374,16 +374,16 @@ Open **Tools > Serial Monitor** at 115200 baud to see what the device is doing.
 - \`EspDisplay.ino\` and \`User_Setup.h\` are the same for every device; only
   \`config.h\` changes.
 
-## Firmware versions
+## Draw engine versions
 
 This is **${FW_VERSION}**. The device reports its version to the portal (Devices >
-details), and the portal flags a device whose screen uses something its firmware
+details), and the portal flags a device whose screen uses something its draw engine
 can't draw yet.
 
-- **v2**: rotated text, and rotating the whole screen 180 degrees (set per device on the
+- **Draw engine v2**: rotated text, and rotating the whole screen 180 degrees (set per device on the
   portal's Devices page, for a display mounted upside down). The orientation is
   remembered across restarts.
-- Devices still on **v1** keep working with no changes: they get the same frames as
+- Devices still on **draw engine v1** keep working with no changes: they get the same frames as
   before. Rotated shapes draw the same on them; rotated text is drawn unrotated and the
   180-degree screen rotation is ignored until the device is reflashed with these files.
   To update, download the setup files again and upload them (same steps as above;

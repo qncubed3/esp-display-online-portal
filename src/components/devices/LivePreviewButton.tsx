@@ -217,7 +217,7 @@ function LivePreview({ deviceId, deviceName, frameVersion }: { deviceId: string;
             {rotatedShown && <span className="block">Shown turned 180°, the way this device shows it.</span>}
             {rotatedSet && !rotatedShown && (
               <span className="block">
-                Rotate 180° is set, but {frameVersion === null ? "the device hasn't reported its firmware yet" : "this device's firmware ignores it"}; it
+                Rotate 180° is set, but {frameVersion === null ? "the device hasn't reported its draw engine yet" : "this device's draw engine ignores it"}; it
                 applies with {firmwareForFrame(FEATURES.screenRotation.minFrame)} or later.
               </span>
             )}

@@ -462,7 +462,7 @@ function olderDevicesNote(field: Field, value: unknown, byFrame: Record<number, 
   if (typeof value === "number" && value % 360 === 0) return undefined;
   const n = Object.entries(byFrame).reduce((sum, [v, count]) => (Number(v) < field.minFrame! ? sum + count : sum), 0);
   if (!n) return undefined;
-  return `${n} of your devices on this service ${n === 1 ? "runs" : "run"} older firmware and will show this unrotated until reflashed.`;
+  return `${n} of your devices on this service ${n === 1 ? "runs" : "run"} an older draw engine and will show this unrotated until reflashed.`;
 }
 
 export default function DrawEditor({ rows, onChange, variables, selectedId: sel, onSelect: select, devicesByFrame }: DrawEditorProps) {

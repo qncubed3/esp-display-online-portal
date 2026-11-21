@@ -76,7 +76,7 @@ export const ANGLE_KEY = "angle";
 // JSON saved before it existed load unchanged. Any whole number works; the presets are quick picks.
 const angle = (textOnly = false): Field => ({
   key: ANGLE_KEY, label: "Rotation", type: "int", default: 0, optional: true, presets: [0, 90, 180, 270],
-  ...(textOnly ? { minFrame: 2, hint: "Rotated text needs firmware v2 on the device; older firmware draws it unrotated." } : {}),
+  ...(textOnly ? { minFrame: 2, hint: "Rotated text needs draw engine v2 on the device; older devices draw it unrotated." } : {}),
 });
 const pt = (n: number, dx: number, dy: number): Field[] => [
   { key: `x${n}`, label: `X${n}`, type: "int", default: dx },

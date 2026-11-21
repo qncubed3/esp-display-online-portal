@@ -48,7 +48,7 @@ function opSection(def: OpDef): string {
   const args = def.fields.map((f, i) => {
     const labels = f.type === "select" && f.options?.some((o) => o.label !== String(o.value)) ? ` (${f.options.map((o) => o.label).join(", ")})` : "";
     const opt = f.optional ? `; optional, default omitted` : `; default ${JSON.stringify(f.default)}`;
-    const more = f.key === ANGLE_KEY ? `, degrees clockwise about the item's centre (0 = upright)${f.minFrame ? "; needs firmware v2, older devices draw it unrotated" : ""}` : "";
+    const more = f.key === ANGLE_KEY ? `, degrees clockwise about the item's centre (0 = upright)${f.minFrame ? "; needs draw engine v2 on the device, older devices draw it unrotated" : ""}` : "";
     return `${i + 1}. \`${f.key}\`: ${fieldType(f)}. ${f.label}${labels}${more}${opt}`;
   });
   return [`#### \`${def.op}\` (${def.label})`, "", `\`${sig}\`, e.g. \`${example}\``, "", ...args].join("\n");
@@ -94,7 +94,7 @@ Text state is **sticky, like TFT_eSPI**: \`setTextColor\`, \`setTextSize\` and \
 Rotation: ${rotatable} take an optional **last** arg \`angle\`, in degrees clockwise (any whole number; 90, 180 and 270 are the usual ones). The item turns about its centre: the centre of its box (for text, the box the unrotated text covers, placed by the datum as usual; for a line, its midpoint). Leave it off (or 0) for upright. Since it's last, earlier optional args must be given to reach it: \`["drawString", "Hi", 160, 120, 2, 90]\`, or for \`text\` pass \`""\` as \`bg\` to keep a transparent background: \`["text", "Hi", 160, 120, 2, 1, "MC", "#FFFFFF", "", 90]\`.
 
 - Rotated shapes work on every device (the server turns them into triangles and lines; rounded corners at angles other than 90/180/270 become short straight segments).
-- Rotated **text needs firmware v2** on the device; devices on older firmware draw it unrotated, so keep it readable either way (don't let unrotated text overlap other things).
+- Rotated **text needs draw engine v2** on the device; devices on an older draw engine draw it unrotated, so keep it readable either way (don't let unrotated text overlap other things).
 - Rotating the **whole screen** 180 degrees (a display mounted upside down) is a per-device setting on the portal's Devices page, not something Draw ops can do. Always lay out for the normal ${W}x${H} landscape, never pre-rotate the design.
 
 Fonts (\`drawString\`'s last arg), size at text size 1 (multiply by \`setTextSize\`):

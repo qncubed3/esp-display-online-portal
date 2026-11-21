@@ -110,7 +110,7 @@ function DeviceInfoButton({ d, now }: { d: DeviceListRow; now: number }) {
             </div>
           )}
           <InfoRow label="Polls in the last 24 h">{d.polls24h.toLocaleString("en")}</InfoRow>
-          <InfoRow label="Firmware">
+          <InfoRow label="Draw engine">
             {d.fw ? (
               <span className="inline-flex items-center gap-2">
                 <span className="font-mono text-[12px]" title={d.fw}>
@@ -301,8 +301,8 @@ export default function DeviceList({
       {filesDialog}
       {needUpdate > 0 && (
         <p className="mb-3 rounded-md border border-border bg-panel px-3 py-2 text-[13px] text-muted">
-          {needUpdate === 1 ? "1 device needs" : `${needUpdate} devices need`} a firmware update to show everything on
-          its screen (rotated text, screen rotated 180°). Click <span className="text-amber-300">Update firmware</span> next
+          {needUpdate === 1 ? "1 device needs" : `${needUpdate} devices need`} a draw engine update to show everything on
+          its screen (rotated text, screen rotated 180°). Click <span className="text-amber-300">Update draw engine</span> next
           to it for the setup files, then upload them again.
         </p>
       )}
@@ -312,7 +312,7 @@ export default function DeviceList({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search devices, services, firmware"
+            placeholder="Search devices, services, versions"
             aria-label="Search devices"
             className="pl-8"
           />
@@ -352,7 +352,7 @@ export default function DeviceList({
               <th className="px-4 py-2 font-normal">Last seen</th>
               <th className="px-4 py-2 font-normal">Next update</th>
               <th className="px-4 py-2 font-normal">Status</th>
-              <th className="px-4 py-2 font-normal">Firmware</th>
+              <th className="px-4 py-2 font-normal">Draw engine</th>
               <th className="w-px px-4 py-2">
                 <span className="sr-only">Actions</span>
               </th>

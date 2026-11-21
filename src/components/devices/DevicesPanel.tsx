@@ -240,7 +240,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
               <th className="px-3 py-2 font-normal">Next update</th>
               <th className="px-3 py-2 font-normal">Service</th>
               <th className="px-3 py-2 font-normal">Update frequency</th>
-              <th className="px-3 py-2 font-normal">Firmware</th>
+              <th className="px-3 py-2 font-normal">Draw engine</th>
               <th className="w-px px-3 py-2">
                 <span className="sr-only">Actions</span>
               </th>

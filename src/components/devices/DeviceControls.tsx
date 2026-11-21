@@ -198,7 +198,7 @@ export function PollFrequency({
         value={value}
         onChange={(e) => void change(Number(e.target.value))}
         disabled={state === "saving"}
-        className="w-28 shrink-0"
+        className="w-24 shrink-0"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -293,7 +293,7 @@ export function ServiceSelect({
         value={value}
         onChange={(e) => void change(e.target.value)}
         disabled={state === "saving"}
-        className="w-[13.5rem] shrink-0"
+        className="w-[10.5rem] shrink-0"
       >
         <ServiceOptions services={services} extra={known ? null : { id: value, label: "Service you can't access" }} />
       </Select>
@@ -398,7 +398,7 @@ export function ScreenRotationButton({
   const title = [
     rotated ? "Screen rotated 180° — click to set back to normal" : "Screen orientation: normal — click to rotate 180° (for a display mounted upside down)",
     unsupported
-      ? `This device runs older firmware: the setting is saved, but only applies after you reflash it with ${firmwareForFrame(need)}.`
+      ? `This device runs an older draw engine: the setting is saved, but only applies after you reflash it with ${firmwareForFrame(need)}.`
       : frameVersion === null
         ? `Needs ${firmwareForFrame(need)} or later on the device.`
         : "",
@@ -449,7 +449,7 @@ export function ScreenRotationButton({
 // (rotated text, the screen rotated 180°). Nothing for devices that need nothing new, however old.
 export function FirmwareUpdateBadge({ fw, missing, onClick }: { fw: string | null; missing: Feature[]; onClick?: () => void }) {
   if (!missing.length) return null;
-  const title = `Running ${firmwareLabel(fw) ? `firmware ${firmwareLabel(fw)}` : "older firmware"}. ${missingSentence(missing)} Click for the setup files, then upload them again.`;
+  const title = `Running ${firmwareLabel(fw) ? `draw engine ${firmwareLabel(fw)}` : "an older draw engine"}. ${missingSentence(missing)} Click for the setup files, then upload them again.`;
   return (
     <button
       type="button"
@@ -457,7 +457,7 @@ export function FirmwareUpdateBadge({ fw, missing, onClick }: { fw: string | nul
       title={title}
       className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-400/20"
     >
-      <AlertCircle size={11} aria-hidden /> Update firmware
+      <AlertCircle size={11} aria-hidden /> Update draw engine
     </button>
   );
 }
@@ -481,7 +481,7 @@ export function FirmwareCell({
   const outdated = firmwareStatus(fw) === "outdated" || (polled && !firmwareLabel(fw));
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <span className="font-mono text-[12px]" title={fw ?? (polled ? "Not reported (older firmware)" : "Hasn't polled yet")}>
+      <span className="font-mono text-[12px]" title={fw ?? (polled ? "Not reported (an older draw engine)" : "Hasn't polled yet")}>
         {label ?? "—"}
       </span>
       {missing.length > 0 ? (
@@ -490,7 +490,7 @@ export function FirmwareCell({
         <button
           type="button"
           onClick={onUpdate}
-          title={`Latest is ${FW_LATEST}. Nothing on this device's screen needs it yet; download the setup files and upload them to update.`}
+          title={`Latest draw engine is ${FW_LATEST}. Nothing on this device's screen needs it yet; download the setup files and upload them to update.`}
           className="rounded-full border border-border px-1.5 py-0.5 text-[11px] text-muted hover:bg-panel-hover hover:text-fg"
         >
           Out of date
