@@ -17,6 +17,7 @@ export default function ServiceCard({
   rows,
   shared = false,
   badges,
+  owner,
   date,
   footer,
 }: {
@@ -28,6 +29,8 @@ export default function ServiceCard({
   shared?: boolean;
   /** Extra badges before the Enabled/Disabled one, e.g. "New". */
   badges?: ReactNode;
+  /** Shown as "By <owner>" under the name (shared Services: the owner's email). */
+  owner?: string | null;
   /** Right side of the bottom line, e.g. "Updated 2h ago". */
   date: ReactNode;
   footer?: ReactNode;
@@ -39,11 +42,18 @@ export default function ServiceCard({
       </div>
       <div className="flex flex-1 flex-col p-4">
         <div className="mb-6 flex items-start justify-between gap-3">
-          <h3 className="min-w-0 truncate text-sm font-medium">
-            <ServiceLink service={{ id, name, enabled, shared }} className="after:absolute after:inset-0 after:rounded-md">
-              {name}
-            </ServiceLink>
-          </h3>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-medium">
+              <ServiceLink service={{ id, name, enabled, shared }} className="after:absolute after:inset-0 after:rounded-md">
+                {name}
+              </ServiceLink>
+            </h3>
+            {owner && (
+              <p className="mt-0.5 truncate text-[12px] text-muted" title={owner}>
+                By {owner}
+              </p>
+            )}
+          </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {badges}
             <Badge variant={enabled ? "success" : "neutral"}>{enabled ? "Enabled" : "Disabled"}</Badge>

@@ -21,6 +21,8 @@ export interface SharedService {
   enabled: boolean;
   deviceCount: number;
   draw_ops: DrawRow[];
+  /** The owner's email; null if it couldn't be looked up. */
+  ownerEmail: string | null;
   addedAt: string;
   isNew: boolean; // not yet seen (service_members.seen_at is null)
 }
