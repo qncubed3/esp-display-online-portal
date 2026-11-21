@@ -4,6 +4,8 @@
 // Nothing stores the frame a device was sent, so the screen is rebuilt here the same way the poll
 // endpoint (src/app/api/device/frame/route.ts) builds it: the Service's saved Draw ops filled with
 // the saved Data code's current variables (POST /api/preview with no `code`). Close enough, not exact.
+// Like the endpoint, a device on 1.x firmware is shown its v1 frame (rotated text unrotated, flip
+// ignored); a flipped device on 2.0+ is shown turned 180°, as someone facing it sees it.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MonitorPlay } from "lucide-react";
@@ -11,6 +13,9 @@ import { Dialog } from "@/components/ui/Dialog";
 import DevicePreview from "@/components/draw/DevicePreview";
 import { createClient } from "@/lib/supabase/client";
 import { toWireOps, type DrawRow, type WireOp } from "@/lib/draw/ops";
+import { toV1Ops } from "@/lib/draw/rotate";
+import { FEATURES } from "@/lib/draw/capabilities";
+import { deviceFrameVersion, firmwareForFrame } from "@/lib/firmware/version";
 import { errorFrameOps, noServiceOps } from "@/lib/draw/screens";
 
 // Keep in sync with the device endpoint.
@@ -25,6 +30,7 @@ interface DeviceRow {
   service_id: string | null;
   last_seen_at: string | null;
   poll_seconds?: number | null;
+  rotation?: number | null; // added by migration 011
 }
 
 type Screen =
@@ -48,7 +54,7 @@ function mmss(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function LivePreview({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
+function LivePreview({ deviceId, deviceName, frameVersion }: { deviceId: string; deviceName: string; frameVersion: number | null }) {
   const [device, setDevice] = useState<DeviceRow | null>(null);
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen | null>(null);
@@ -139,6 +145,10 @@ function LivePreview({ deviceId, deviceName }: { deviceId: string; deviceName: s
     void loadScreen(device.service_id);
   }, [remainingS, offline, device, loadDevice, loadScreen]);
 
+  const v1 = frameVersion !== null && frameVersion < 2;
+  const flipSet = device?.rotation === 3;
+  const flipShown = flipSet && frameVersion !== null && frameVersion >= FEATURES.screenFlip.minFrame;
+
   if (deviceError) {
     return <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-300">{deviceError}</p>;
   }
@@ -189,7 +199,11 @@ function LivePreview({ deviceId, deviceName }: { deviceId: string; deviceName: s
         </p>
       ) : (
         <div className="flex flex-col items-center gap-2">
-          <DevicePreview ops={screen.kind === "none" ? noServiceOps(deviceName) : screen.ops} scale={2} />
+          <DevicePreview
+            ops={screen.kind === "none" ? noServiceOps(deviceName) : v1 ? toV1Ops(screen.ops) : screen.ops}
+            scale={2}
+            flipped={flipShown}
+          />
           <p className="text-center text-[12px] text-[#6b6b6b]">
             {screen.kind === "none" ? (
               "No service assigned: this is the screen the device is sent."
@@ -200,6 +214,13 @@ function LivePreview({ deviceId, deviceName }: { deviceId: string; deviceName: s
                 {screen.kind === "dataError" && <span className="block text-red-300">Data error: {screen.error}</span>}
               </>
             )}
+            {flipShown && <span className="block">Shown turned 180°: this device&apos;s screen is flipped.</span>}
+            {flipSet && !flipShown && (
+              <span className="block">
+                Screen flip is set, but {frameVersion === null ? "the device hasn't reported its firmware yet" : "this device's firmware ignores it"}; it
+                applies with {firmwareForFrame(FEATURES.screenFlip.minFrame)} or later.
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -207,7 +228,18 @@ function LivePreview({ deviceId, deviceName }: { deviceId: string; deviceName: s
   );
 }
 
-export default function LivePreviewButton({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
+export default function LivePreviewButton({
+  deviceId,
+  deviceName,
+  fw = null,
+  polled = false,
+}: {
+  deviceId: string;
+  deviceName: string;
+  /** X-FW from the device's latest poll, to show what its firmware draws. */
+  fw?: string | null;
+  polled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -221,7 +253,7 @@ export default function LivePreviewButton({ deviceId, deviceName }: { deviceId: 
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title={`Live preview: ${deviceName}`} className="max-w-[720px]">
         {/* Mounted only while open, so its timers stop when the dialog closes. */}
-        {open && <LivePreview deviceId={deviceId} deviceName={deviceName} />}
+        {open && <LivePreview deviceId={deviceId} deviceName={deviceName} frameVersion={deviceFrameVersion(fw, polled)} />}
       </Dialog>
     </>
   );

@@ -24,7 +24,18 @@ import { Select } from "@/components/ui/Select";
 import LivePreviewButton from "./LivePreviewButton";
 import SetupFilesDialog from "./SetupFilesDialog";
 import { devicesChanged, refreshLists } from "@/lib/store/cache";
-import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, ServiceSelect, pollLabel } from "./DeviceControls";
+import {
+  AddDeviceForm,
+  FirmwareUpdateBadge,
+  NewKeyCallout,
+  NextPollCountdown,
+  PollFrequency,
+  ScreenFlipButton,
+  ServiceSelect,
+  pollLabel,
+} from "./DeviceControls";
+import { deviceMissingFeatures } from "@/lib/draw/capabilities";
+import { deviceFrameVersion } from "@/lib/firmware/version";
 
 const ONLINE_MS = 2 * 60 * 1000;
 
@@ -270,6 +281,13 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                       ) : (
                         d.name
                       )}
+                      {d.mine && (
+                        <FirmwareUpdateBadge
+                          fw={d.fw}
+                          missing={deviceMissingFeatures({ rotation: d.rotation, contentNeeds: d.content_needs, fw: d.fw, polled: d.polled })}
+                          onClick={() => setFilesFor({ name: d.name })}
+                        />
+                      )}
                       {!d.mine && (
                         <span
                           className="inline-flex min-w-0 items-center gap-1 text-[12px] text-[#6b6b6b]"
@@ -311,7 +329,17 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                     {d.mine && (
                       <div className="flex items-center justify-end gap-1">
                         {busy === d.id && <Loader2 size={13} className="animate-spin text-[#a0a0a0]" />}
-                        <LivePreviewButton deviceId={d.id} deviceName={d.name} />
+                        <ScreenFlipButton
+                          key={d.rotation ?? 1}
+                          deviceId={d.id}
+                          deviceName={d.name}
+                          rotation={d.rotation === 3 ? 3 : 1}
+                          frameVersion={deviceFrameVersion(d.fw, d.polled)}
+                          onChanged={() => void changed()}
+                          label
+                          className="rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed] disabled:opacity-50"
+                        />
+                        <LivePreviewButton deviceId={d.id} deviceName={d.name} fw={d.fw} polled={d.polled} />
                         <button
                           type="button"
                           onClick={() => setFilesFor({ name: d.name })}

@@ -23,6 +23,7 @@ export default function DevicePreview({
   onKeyDown,
   cursor = "crosshair",
   interactive = false,
+  flipped = false,
 }: {
   ops: WireOp[];
   scale?: number;
@@ -33,6 +34,8 @@ export default function DevicePreview({
   cursor?: string;
   /** Dragging on it edits the screen, so touch gestures must not scroll the page. Off for thumbnails. */
   interactive?: boolean;
+  /** Show the screen turned 180°, as a flipped device shows it to someone facing it. Not for editing. */
+  flipped?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
@@ -51,7 +54,7 @@ export default function DevicePreview({
   return (
     <div className="inline-flex max-w-full flex-col items-center gap-2">
       <div className="max-w-full rounded-xl border border-[#2e2e2e] bg-[#111] p-3 shadow-[0_0_0_1px_#000_inset,0_8px_24px_rgba(0,0,0,0.45)]">
-        <div className="relative">
+        <div className={`relative ${flipped ? "rotate-180" : ""}`}>
           <canvas
             ref={canvasRef}
             width={SCREEN_WIDTH}

@@ -8,6 +8,8 @@ import { revalidatePath } from "next/cache";
 import { notify } from "@/lib/notifications/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { featuresNeeded, type Feature } from "@/lib/draw/capabilities";
+import type { DrawRow } from "@/lib/draw/ops";
 import { generateDeviceKey, hashKey } from "./keys";
 
 export interface DeviceRow {
@@ -19,6 +21,8 @@ export interface DeviceRow {
   created_at: string;
   /** Seconds between polls; missing until migration 006 has run. */
   poll_seconds?: number;
+  /** Screen orientation, 1 normal or 3 flipped 180°; missing until migration 011 has run. */
+  rotation?: number;
 }
 
 /** A device on a Service's Devices tab; `mine` is true when the signed-in user owns it. */
@@ -26,6 +30,11 @@ export interface ServiceDeviceRow extends DeviceRow {
   mine: boolean;
   /** The owner's email; null if it couldn't be looked up. */
   owner_email: string | null;
+  /** Own devices only: X-FW from the latest logged poll, and whether it has polled at all. */
+  fw: string | null;
+  polled: boolean;
+  /** What this Service's screen uses that needs newer firmware (src/lib/draw/capabilities.ts). */
+  content_needs: Feature[];
 }
 
 /** One of the signed-in user's devices, with the name of the Service it's subscribed to. */
@@ -120,8 +129,28 @@ export async function listServiceDevices(serviceId: string): Promise<ServiceDevi
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   const devices = (data ?? []) as DeviceRow[];
-  const emails = await emailsFor(devices.map((d) => d.owner_id));
-  return devices.map((d) => ({ ...d, mine: d.owner_id === user.id, owner_email: emails.get(d.owner_id) ?? null }));
+  const own = devices.filter((d) => d.owner_id === user.id);
+  const [emails, service, polls] = await Promise.all([
+    emailsFor(devices.map((d) => d.owner_id)),
+    supabase.from("services").select("draw_ops").eq("id", serviceId).maybeSingle(),
+    // Latest poll per own device (one indexed single-row query each; a Service has few devices).
+    Promise.all(
+      own.map((d) =>
+        supabase.from("device_polls").select("fw").eq("device_id", d.id).order("at", { ascending: false }).limit(1).maybeSingle(),
+      ),
+    ),
+  ]);
+  const latest = new Map(own.map((d, i) => [d.id, polls[i].data as { fw: string | null } | null]));
+  const rows = (service.data as { draw_ops: DrawRow[] | null } | null)?.draw_ops ?? null;
+  const contentNeeds = featuresNeeded({ rows });
+  return devices.map((d) => ({
+    ...d,
+    mine: d.owner_id === user.id,
+    owner_email: emails.get(d.owner_id) ?? null,
+    fw: latest.get(d.id)?.fw ?? null,
+    polled: !!latest.get(d.id),
+    content_needs: contentNeeds,
+  }));
 }
 
 // Emails for user ids, via the admin API (users can't read auth.users). Only called with the
@@ -202,6 +231,21 @@ export async function setDevicePollSeconds(deviceId: string, seconds: number): P
   const s = Math.round(seconds);
   if (!(s >= 15 && s <= 3600)) throw new Error("Poll frequency must be between 15 seconds and 1 hour.");
   await updateOwnDevice(deviceId, { poll_seconds: s });
+}
+
+// Turns the device's screen 180° (3) or back to normal (1), for a display mounted upside down.
+// Firmware 2.0+ picks it up on its next poll; 1.x firmware ignores it until reflashed.
+export async function setDeviceRotation(deviceId: string, rotation: number): Promise<void> {
+  if (rotation !== 1 && rotation !== 3) throw new Error("Rotation must be 1 (normal) or 3 (flipped).");
+  try {
+    await updateOwnDevice(deviceId, { rotation });
+  } catch (e) {
+    // Before migration 011 the column doesn't exist.
+    if (e instanceof Error && /rotation/.test(e.message) && /column/i.test(e.message)) {
+      throw new Error("Screen flipping needs database migration 011 (supabase/migrations/011_device_rotation.sql).");
+    }
+    throw e;
+  }
 }
 
 // Replaces a device's key; the old key stops working immediately. Returns the new key (shown once).

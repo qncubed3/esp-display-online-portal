@@ -6,7 +6,15 @@ import { Cpu, ExternalLink, FileCode2, Info, KeyRound, Loader2, Plus, Search, Tr
 import LivePreviewButton from "@/components/devices/LivePreviewButton";
 import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
 import TransferDeviceButton from "@/components/devices/TransferDeviceButton";
-import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, ServiceSelect } from "@/components/devices/DeviceControls";
+import {
+  AddDeviceForm,
+  FirmwareUpdateBadge,
+  NewKeyCallout,
+  NextPollCountdown,
+  PollFrequency,
+  ScreenFlipButton,
+  ServiceSelect,
+} from "@/components/devices/DeviceControls";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -17,6 +25,11 @@ import { addDevice, deleteDevice, regenerateDeviceKey, renameDevice, type Subscr
 import { devicesChanged, patchDevice, refreshLists } from "@/lib/store/cache";
 import { timeAgo } from "@/lib/time";
 import { formatBytes, formatUptime, signalBars, type DeviceListRow } from "@/lib/device-list/types";
+import { deviceMissingFeatures } from "@/lib/draw/capabilities";
+import { FW_LATEST, deviceFrameVersion, firmwareStatus } from "@/lib/firmware/version";
+
+const missingFor = (d: DeviceListRow) =>
+  deviceMissingFeatures({ rotation: d.rotation, contentNeeds: d.contentNeeds, fw: d.fw, polled: !!d.lastPollAt });
 
 type Filter = "all" | "online" | "offline";
 const FILTERS: { value: Filter; label: string }[] = [
@@ -96,7 +109,21 @@ function DeviceInfoButton({ d, now }: { d: DeviceListRow; now: number }) {
             </div>
           )}
           <InfoRow label="Polls in the last 24 h">{d.polls24h.toLocaleString("en")}</InfoRow>
-          <InfoRow label="Firmware">{d.fw ? <span className="font-mono text-[12px]">{d.fw}</span> : dash}</InfoRow>
+          <InfoRow label="Firmware">
+            {d.fw ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="font-mono text-[12px]">{d.fw}</span>
+                <span className="text-[12px] text-muted">
+                  {firmwareStatus(d.fw) === "outdated" ? `update available: ${FW_LATEST}` : `latest: ${FW_LATEST}`}
+                </span>
+              </span>
+            ) : (
+              <span className="text-[12px] text-muted">
+                {d.lastPollAt ? "not reported" : "—"} · latest: {FW_LATEST}
+              </span>
+            )}
+          </InfoRow>
+          <InfoRow label="Screen orientation">{d.rotation === 3 ? "Flipped 180°" : "Normal"}</InfoRow>
           <InfoRow label="WiFi signal">
             {d.rssi != null ? (
               <span className="inline-flex items-center gap-2">
@@ -262,11 +289,20 @@ export default function DeviceList({
 
   const counts = { all: devices.length, online: devices.filter((d) => d.online).length } as Record<Filter, number>;
   counts.offline = counts.all - counts.online;
+  // Only devices whose screen uses something their firmware can't draw; older firmware alone is fine.
+  const needUpdate = devices.filter((d) => missingFor(d).length > 0).length;
 
   return (
     <div>
       {panels}
       {filesDialog}
+      {needUpdate > 0 && (
+        <p className="mb-3 rounded-md border border-border bg-panel px-3 py-2 text-[13px] text-muted">
+          {needUpdate === 1 ? "1 device needs" : `${needUpdate} devices need`} a firmware update to show everything on
+          its screen (rotated text, screen flipping). Click <span className="text-amber-300">Update firmware</span> next
+          to it for the setup files, then upload them again.
+        </p>
+      )}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-xs">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -336,6 +372,7 @@ export default function DeviceList({
                         patchDevice(d.id, { name });
                       }}
                     />
+                    <FirmwareUpdateBadge fw={d.fw} missing={missingFor(d)} onClick={() => setFilesFor({ name: d.name })} />
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-1.5">
@@ -389,8 +426,17 @@ export default function DeviceList({
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                     {busy === d.id && <Loader2 size={13} className="animate-spin text-muted" />}
+                    <ScreenFlipButton
+                      key={d.rotation}
+                      deviceId={d.id}
+                      deviceName={d.name}
+                      rotation={d.rotation}
+                      frameVersion={deviceFrameVersion(d.fw, !!d.lastPollAt)}
+                      onChanged={(rotation) => patchDevice(d.id, { rotation })}
+                      className={iconButton}
+                    />
                     <DeviceInfoButton d={d} now={now} />
-                    <LivePreviewButton deviceId={d.id} deviceName={d.name} />
+                    <LivePreviewButton deviceId={d.id} deviceName={d.name} fw={d.fw} polled={!!d.lastPollAt} />
                     <button
                       type="button"
                       onClick={() => setFilesFor({ name: d.name })}

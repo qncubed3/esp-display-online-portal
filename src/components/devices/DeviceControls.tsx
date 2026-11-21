@@ -3,9 +3,11 @@
 // Device controls shared by the /devices page and a Service's Devices tab.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Copy, FileCode2, Loader2, X } from "lucide-react";
+import { AlertCircle, Check, Copy, FileCode2, FlipVertical2, Loader2, X } from "lucide-react";
 import { Select } from "@/components/ui/Select";
-import { setDevicePollSeconds, setDeviceService, type SubscribableService } from "@/lib/devices/actions";
+import { setDevicePollSeconds, setDeviceRotation, setDeviceService, type SubscribableService } from "@/lib/devices/actions";
+import { FEATURES, missingSentence, type Feature } from "@/lib/draw/capabilities";
+import { firmwareForFrame } from "@/lib/firmware/version";
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -360,5 +362,101 @@ export function AddDeviceForm({
         Cancel
       </button>
     </form>
+  );
+}
+
+// Flips the device's screen 180° (for a display mounted upside down) or back. The state shows in
+// the icon (turned and green when flipped). Firmware older than 2.0 ignores the setting: it's
+// saved anyway and applies once the device is reflashed, and the tooltip says so.
+export function ScreenFlipButton({
+  deviceId,
+  deviceName,
+  rotation,
+  frameVersion,
+  onChanged,
+  className,
+  label = false,
+}: {
+  deviceId: string;
+  deviceName: string;
+  rotation: 1 | 3;
+  /** The frame schema the device's firmware reads (deviceFrameVersion); null if it never polled. */
+  frameVersion: number | null;
+  onChanged?: (rotation: 1 | 3) => void;
+  className?: string;
+  /** Show "Flip"/"Flipped" next to the icon. */
+  label?: boolean;
+}) {
+  const [value, setValue] = useState(rotation);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null); // callers key it by `rotation` to resync
+
+  const flipped = value === 3;
+  const need = FEATURES.screenFlip.minFrame;
+  const unsupported = frameVersion !== null && frameVersion < need;
+  const title = [
+    flipped ? "Screen orientation: flipped 180° — click to set back to normal" : "Screen orientation: normal — click to flip 180°",
+    unsupported
+      ? `This device runs older firmware: the setting is saved, but only applies after you reflash it with ${firmwareForFrame(need)}.`
+      : frameVersion === null
+        ? `Needs ${firmwareForFrame(need)} or later on the device.`
+        : "",
+    error ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  async function toggle() {
+    const next: 1 | 3 = flipped ? 1 : 3;
+    setValue(next);
+    setSaving(true);
+    setError(null);
+    try {
+      await setDeviceRotation(deviceId, next);
+      onChanged?.(next);
+    } catch (e) {
+      setValue(value);
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void toggle()}
+      disabled={saving}
+      title={title}
+      aria-label={`${flipped ? "Unflip" : "Flip"} the screen of ${deviceName}`}
+      aria-pressed={flipped}
+      className={`${className ?? ""} inline-flex items-center gap-1 whitespace-nowrap ${
+        error ? "text-[#ff8a8e]" : flipped ? (unsupported ? "text-amber-300" : "text-[#3ecf8e]") : ""
+      }`}
+    >
+      {saving ? (
+        <Loader2 size={13} className="animate-spin" />
+      ) : (
+        <FlipVertical2 size={13} className={flipped ? "rotate-180 transition-transform" : "transition-transform"} />
+      )}
+      {label && (flipped ? "Flipped" : "Flip")}
+    </button>
+  );
+}
+
+// Amber "Update firmware" pill for a device whose screen uses something its firmware can't draw
+// (rotated text, the screen flip). Nothing for devices that need nothing new, however old.
+export function FirmwareUpdateBadge({ fw, missing, onClick }: { fw: string | null; missing: Feature[]; onClick?: () => void }) {
+  if (!missing.length) return null;
+  const title = `Running ${fw ?? "older firmware"}. ${missingSentence(missing)} Click for the setup files, then upload them again.`;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-400/20"
+    >
+      <AlertCircle size={11} aria-hidden /> Update firmware
+    </button>
   );
 }

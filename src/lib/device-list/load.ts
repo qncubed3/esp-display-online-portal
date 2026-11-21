@@ -4,6 +4,8 @@
 
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { featuresNeeded } from "@/lib/draw/capabilities";
+import type { DrawRow } from "@/lib/draw/ops";
 import type { DeviceListRow } from "./types";
 
 const ONLINE_MS = 2 * 60_000;
@@ -20,7 +22,8 @@ interface DeviceDbRow {
   last_seen_at: string | null;
   created_at: string;
   poll_seconds?: number | null; // missing until migration 006 has run
-  services: { id: string; name: string; owner_id: string } | null;
+  rotation?: number | null; // missing until migration 011 has run
+  services: { id: string; name: string; owner_id: string; draw_ops: DrawRow[] | null } | null;
 }
 
 interface LatestPollRow {
@@ -121,7 +124,7 @@ async function pollCounts(
 export async function loadDeviceList(supabase: SupabaseClient, userId: string): Promise<DeviceListRow[]> {
   const { data, error } = await supabase
     .from("devices")
-    .select("*, services(id, name, owner_id)")
+    .select("*, services(id, name, owner_id, draw_ops)")
     .eq("owner_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -144,6 +147,8 @@ export async function loadDeviceList(supabase: SupabaseClient, userId: string): 
         serviceName: d.services?.name ?? null,
         shared: !!d.services && d.services.owner_id !== userId,
         pollSeconds: d.poll_seconds ?? 30,
+        rotation: d.rotation === 3 ? 3 : 1,
+        contentNeeds: featuresNeeded({ rows: d.services?.draw_ops }),
         lastSeenAt: d.last_seen_at,
         online: !!d.last_seen_at && now - new Date(d.last_seen_at).getTime() < ONLINE_MS,
         polls24h: counts.get(d.id) ?? 0,
