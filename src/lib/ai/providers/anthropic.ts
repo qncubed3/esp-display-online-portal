@@ -1,17 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ProviderError, type CompletionRequest, type Effort, type LlmProvider } from "./types";
 
+type StreamParams = Anthropic.Beta.Messages.MessageCreateParamsStreaming;
+
 // Thinking and effort settings for an effort choice. "off" turns thinking off where the model
 // allows it (Haiku 5.5, Opus 5: `disabled`; Sonnet 5.5: `between_tools`); models where thinking
 // can't be turned off (e.g. Opus 5.5) run at low effort instead.
-function thinkingParams(model: string, effort: Effort): Pick<Anthropic.MessageCreateParams, "thinking" | "output_config"> {
+function thinkingParams(model: string, effort: Effort): Pick<StreamParams, "thinking" | "output_config"> {
   if (effort !== "off") return { output_config: { effort } };
   if (/^claude-(haiku-5-5|opus-5)$/.test(model)) return { thinking: { type: "disabled" }, output_config: { effort: "low" } };
   if (model === "claude-sonnet-5-5") {
-    return { thinking: { type: "between_tools" } as unknown as Anthropic.MessageCreateParams["thinking"], output_config: { effort: "low" } };
+    return { thinking: { type: "between_tools" } as unknown as StreamParams["thinking"], output_config: { effort: "low" } };
   }
   return { output_config: { effort: "low" } };
 }
+
+// Models with Anthropic's server-side refusal fallback: if the model declines (its safety
+// classifiers can misfire on benign requests), the API retries on a fallback model in the same
+// stream. Our own fallback (e.g. to Gemini) still applies if the whole chain declines.
+const SERVER_FALLBACK = /^claude-(sonnet-5-5|opus-5|opus-5-5|fable-5(-\d)?)$/;
 
 // Anthropic Messages API (Claude), via the official SDK, streamed.
 // The system prompt (the fixed instruction block) is cached: repeat requests within 5 minutes read
@@ -30,15 +37,17 @@ export class AnthropicProvider implements LlmProvider {
   }
 
   async complete({ system, effort, messages, maxTokens, timeoutMs, onText }: CompletionRequest): Promise<string> {
-    let res: Anthropic.Message;
+    const serverFallback = SERVER_FALLBACK.test(this.model);
+    let res: Anthropic.Beta.Messages.BetaMessage;
     try {
-      const stream = this.client.messages.stream(
+      const stream = this.client.beta.messages.stream(
         {
           model: this.model,
           max_tokens: maxTokens,
           system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
           messages,
           ...thinkingParams(this.model, effort),
+          ...(serverFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
         },
         { timeout: timeoutMs },
       );
@@ -52,9 +61,10 @@ export class AnthropicProvider implements LlmProvider {
 
     const u = res.usage;
     console.info(
-      `${this.label} usage (effort ${effort}): input ${u.input_tokens}, cache read ${u.cache_read_input_tokens ?? 0}, ` +
-        `cache write ${u.cache_creation_input_tokens ?? 0}, output ${u.output_tokens}`,
+      `${this.label} usage (effort ${effort}, answered by ${res.model}): input ${u.input_tokens}, ` +
+        `cache read ${u.cache_read_input_tokens ?? 0}, cache write ${u.cache_creation_input_tokens ?? 0}, output ${u.output_tokens}`,
     );
+    if (res.stop_reason === "max_tokens") console.warn(`${this.label}: reply cut off at max_tokens (${maxTokens})`);
 
     if (res.stop_reason === "refusal") {
       throw new ProviderError(`${this.label}: the model declined this request`, undefined, false, true);

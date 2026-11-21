@@ -28,7 +28,7 @@ const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 8_000;
 const MAX_CODE_CHARS = 30_000;
 // Room for thinking (low effort) plus full Data code and Draw JSON.
-const MAX_TOKENS = 8_192;
+const MAX_TOKENS = 16_000;
 
 // Per-user rate limit. In memory, so per server instance: a guard against runaway use of the
 // provider quota, not a hard limit.

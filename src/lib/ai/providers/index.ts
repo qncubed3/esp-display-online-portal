@@ -23,7 +23,7 @@ export { isBusyError } from "./resilient";
 //   AI_FALLBACK_BASE_URL = openai fallback only
 const DEFAULT_MODELS = {
   gemini: "gemini-3.8-flash",
-  anthropic: "claude-haiku-5-5",
+  anthropic: "claude-sonnet-5-5",
   openai: "gpt-4o-mini",
 } as const;
 type Kind = keyof typeof DEFAULT_MODELS;
