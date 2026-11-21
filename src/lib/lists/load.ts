@@ -28,11 +28,11 @@ async function loadServices(supabase: SupabaseClient, userId: string): Promise<S
 
 // Services other people shared with the user, newest share first.
 async function loadShared(supabase: SupabaseClient, userId: string): Promise<SharedService[]> {
-  type Svc = { id: string; name: string; enabled: boolean; devices: DeviceCount };
+  type Svc = { id: string; name: string; enabled: boolean; draw_ops: DrawRow[] | null; devices: DeviceCount };
   type Row = { created_at: string; seen_at: string | null; services: Svc | Svc[] | null };
   const { data, error } = await supabase
     .from("service_members")
-    .select("created_at, seen_at, services(id, name, enabled, devices(count))")
+    .select("created_at, seen_at, services(id, name, enabled, draw_ops, devices(count))")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -45,6 +45,7 @@ async function loadShared(supabase: SupabaseClient, userId: string): Promise<Sha
         name: svc.name,
         enabled: svc.enabled,
         deviceCount: svc.devices?.[0]?.count ?? 0,
+        draw_ops: Array.isArray(svc.draw_ops) ? svc.draw_ops : [],
         addedAt: r.created_at,
         isNew: r.seen_at === null,
       },

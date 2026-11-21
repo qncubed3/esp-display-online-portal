@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Cpu, Monitor } from "lucide-react";
-import ServiceLink from "@/components/services/ServiceLink";
-import ServiceThumb from "@/components/services/ServiceThumb";
-import { Badge } from "@/components/ui/Badge";
+import { Monitor } from "lucide-react";
+import ServiceCard from "@/components/services/ServiceCard";
 import { CardGridSkeleton, skeletonCount } from "@/components/ui/Skeleton";
 import { useList, useListCount } from "@/lib/store/cache";
 import { timeAgo } from "@/lib/time";
@@ -60,27 +58,14 @@ export default function ServiceGrid() {
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((s) => (
           <li key={s.id}>
-            <ServiceLink
-              service={{ id: s.id, name: s.name, enabled: s.enabled }}
-              className="flex h-full flex-col overflow-hidden rounded-md border border-border bg-panel transition-colors hover:border-border-strong hover:bg-panel-hover"
-            >
-              <div className="flex justify-center border-b border-border bg-bg px-4 py-5">
-                <ServiceThumb serviceId={s.id} rows={s.draw_ops} />
-              </div>
-              <div className="flex flex-1 flex-col p-4">
-                <div className="mb-6 flex items-start justify-between gap-3">
-                  <h3 className="min-w-0 truncate text-sm font-medium">{s.name}</h3>
-                  <Badge variant={s.enabled ? "success" : "neutral"}>{s.enabled ? "Enabled" : "Disabled"}</Badge>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[12px] text-muted">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Cpu size={13} />
-                    {s.deviceCount} {s.deviceCount === 1 ? "device" : "devices"}
-                  </span>
-                  <span title={new Date(s.updated_at).toLocaleString()}>Updated {timeAgo(s.updated_at)}</span>
-                </div>
-              </div>
-            </ServiceLink>
+            <ServiceCard
+              id={s.id}
+              name={s.name}
+              enabled={s.enabled}
+              deviceCount={s.deviceCount}
+              rows={s.draw_ops}
+              date={<span title={new Date(s.updated_at).toLocaleString()}>Updated {timeAgo(s.updated_at)}</span>}
+            />
           </li>
         ))}
       </ul>

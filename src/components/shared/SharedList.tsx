@@ -30,7 +30,7 @@ export default function SharedList() {
     </p>
   );
 
-  if (!services) return errorBox || <CardGridSkeleton count={skeletonCount(last)} />;
+  if (!services) return errorBox || <CardGridSkeleton preview count={skeletonCount(last)} />;
 
   return (
     <>

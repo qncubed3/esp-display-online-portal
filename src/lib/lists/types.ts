@@ -20,6 +20,7 @@ export interface SharedService {
   name: string;
   enabled: boolean;
   deviceCount: number;
+  draw_ops: DrawRow[];
   addedAt: string;
   isNew: boolean; // not yet seen (service_members.seen_at is null)
 }
