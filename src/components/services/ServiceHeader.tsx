@@ -118,7 +118,7 @@ export default function ServiceHeader({
               title="Rename"
             >
               <h1 className="truncate text-xl font-medium">{name}</h1>
-              <Pencil size={14} className="shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+              <Pencil size={14} className="shrink-0 text-muted transition-colors group-hover:text-fg" />
             </button>
           )}
           <Badge variant={isEnabled ? "success" : "neutral"}>{isEnabled ? "Enabled" : "Disabled"}</Badge>

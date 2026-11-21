@@ -13,11 +13,13 @@ import {
   listServiceDevices,
   listSubscribableServices,
   regenerateDeviceKey,
+  renameDevice,
   setDeviceService,
   type MyDeviceRow,
   type ServiceDeviceRow,
   type SubscribableService,
 } from "@/lib/devices/actions";
+import { InlineRename } from "@/components/ui/InlineRename";
 import { Select } from "@/components/ui/Select";
 import LivePreviewButton from "./LivePreviewButton";
 import SetupFilesDialog from "./SetupFilesDialog";
@@ -244,12 +246,23 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
               return (
                 <tr key={d.id} className="border-b border-[#2e2e2e] last:border-b-0 hover:bg-[#232323]">
                   <td className="px-3 py-2">
-                    <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex min-w-0 items-center gap-2">
                       <span
                         className={`h-2 w-2 shrink-0 rounded-full ${online ? "bg-[#3ecf8e] shadow-[0_0_6px_#3ecf8e]" : "bg-[#4a4a4a]"}`}
                         title={online ? "Online" : "Offline"}
                       />
-                      {d.name}
+                      {d.mine ? (
+                        <InlineRename
+                          value={d.name}
+                          label={`Rename ${d.name}`}
+                          onSave={async (name) => {
+                            await renameDevice(d.id, name);
+                            await load();
+                          }}
+                        />
+                      ) : (
+                        d.name
+                      )}
                       {!d.mine && (
                         <span
                           className="inline-flex min-w-0 items-center gap-1 text-[12px] text-[#6b6b6b]"

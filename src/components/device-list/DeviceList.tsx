@@ -11,9 +11,10 @@ import { AddDeviceForm, NewKeyCallout, NextPollCountdown, PollFrequency, Service
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { InlineRename } from "@/components/ui/InlineRename";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/components/ui/cn";
-import { addDevice, deleteDevice, regenerateDeviceKey, type SubscribableService } from "@/lib/devices/actions";
+import { addDevice, deleteDevice, regenerateDeviceKey, renameDevice, type SubscribableService } from "@/lib/devices/actions";
 import { timeAgo } from "@/lib/time";
 import { formatBytes, formatUptime, signalBars, type DeviceListRow } from "@/lib/device-list/types";
 
@@ -319,14 +320,20 @@ export default function DeviceList({
             {shown.map((d) => (
               <tr key={d.id} className="border-b border-border last:border-0 hover:bg-panel-hover">
                 <td className="px-4 py-2.5">
-                  <span className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
                     <span
                       className={cn("h-2 w-2 shrink-0 rounded-full", d.online ? "bg-accent" : "bg-muted/40")}
                       title={d.online ? "Online" : "Offline"}
                     />
-                    <span className="max-w-[14rem] truncate font-medium" title={d.name}>
-                      {d.name}
-                    </span>
+                    <InlineRename
+                      value={d.name}
+                      label={`Rename ${d.name}`}
+                      className="max-w-[14rem] font-medium"
+                      onSave={async (name) => {
+                        await renameDevice(d.id, name);
+                        router.refresh();
+                      }}
+                    />
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-1.5">
