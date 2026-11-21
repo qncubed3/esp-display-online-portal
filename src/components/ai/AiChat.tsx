@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, ArrowUp, Code2, Loader2, Shapes, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import { EFFORT_OPTIONS, type AiChatState } from "./useAiChat";
@@ -17,6 +17,19 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
   const { entries, pending, loaded, send, undo, clear, model, effort, setEffort } = chat;
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // The text box grows with its text, up to half the chat panel's height (and 40% of the screen,
+  // since on narrow screens the panel grows too); past that it scrolls, with the scrollbar hidden.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const max = Math.max(52, Math.min((sectionRef.current?.clientHeight ?? 400) / 2, window.innerHeight * 0.4));
+    // scrollHeight excludes the 1px borders (border-box sizing), so add them back.
+    el.style.height = `${Math.min(el.scrollHeight + 2, max)}px`;
+  }, [draft]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -31,7 +44,7 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
   };
 
   return (
-    <section aria-label="AI assistant" className="flex min-w-0 flex-col rounded-md border border-border bg-bg">
+    <section ref={sectionRef} aria-label="AI assistant" className="flex min-w-0 flex-col rounded-md border border-border bg-bg">
       <div className="flex h-9 items-center justify-between gap-2 border-b border-border px-3">
         <div className="flex min-w-0 items-center gap-2">
           <h3 className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium">
@@ -150,6 +163,7 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
       >
         <div className="relative">
           <textarea
+            ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -162,7 +176,7 @@ export default function AiChat({ chat, headerActions }: { chat: AiChatState; /**
             maxLength={4000}
             placeholder="Ask for a change…"
             aria-label="Message the AI assistant"
-            className="block min-h-[52px] w-full resize-y rounded-md border border-border bg-panel py-1.5 pl-2.5 pr-12 text-[13px] text-fg outline-none placeholder:text-muted focus:border-accent"
+            className="block min-h-[52px] w-full resize-none overflow-y-auto rounded-md border border-border bg-panel py-1.5 pl-2.5 pr-12 text-[13px] text-fg outline-none [scrollbar-width:none] placeholder:text-muted focus:border-accent [&::-webkit-scrollbar]:hidden"
           />
           <button
             type="submit"
