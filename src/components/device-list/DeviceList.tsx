@@ -8,13 +8,14 @@ import SetupFilesDialog from "@/components/devices/SetupFilesDialog";
 import TransferDeviceButton from "@/components/devices/TransferDeviceButton";
 import {
   AddDeviceForm,
-  FirmwareUpdateBadge,
+  FirmwareCell,
   NewKeyCallout,
   NextPollCountdown,
   PollFrequency,
   ScreenRotationButton,
   ServiceSelect,
 } from "@/components/devices/DeviceControls";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -26,7 +27,7 @@ import { devicesChanged, patchDevice, refreshLists } from "@/lib/store/cache";
 import { timeAgo } from "@/lib/time";
 import { formatBytes, formatUptime, signalBars, type DeviceListRow } from "@/lib/device-list/types";
 import { deviceMissingFeatures } from "@/lib/draw/capabilities";
-import { FW_LATEST, deviceFrameVersion, firmwareStatus } from "@/lib/firmware/version";
+import { FW_LATEST, deviceFrameVersion, firmwareLabel, firmwareStatus } from "@/lib/firmware/version";
 
 const missingFor = (d: DeviceListRow) =>
   deviceMissingFeatures({ rotation: d.rotation, contentNeeds: d.contentNeeds, fw: d.fw, polled: !!d.lastPollAt });
@@ -112,7 +113,9 @@ function DeviceInfoButton({ d, now }: { d: DeviceListRow; now: number }) {
           <InfoRow label="Firmware">
             {d.fw ? (
               <span className="inline-flex items-center gap-2">
-                <span className="font-mono text-[12px]">{d.fw}</span>
+                <span className="font-mono text-[12px]" title={d.fw}>
+                  {firmwareLabel(d.fw) ?? d.fw}
+                </span>
                 <span className="text-[12px] text-muted">
                   {firmwareStatus(d.fw) === "outdated" ? `update available: ${FW_LATEST}` : `latest: ${FW_LATEST}`}
                 </span>
@@ -349,6 +352,7 @@ export default function DeviceList({
               <th className="px-4 py-2 font-normal">Last seen</th>
               <th className="px-4 py-2 font-normal">Next update</th>
               <th className="px-4 py-2 font-normal">Status</th>
+              <th className="px-4 py-2 font-normal">Firmware</th>
               <th className="w-px px-4 py-2">
                 <span className="sr-only">Actions</span>
               </th>
@@ -372,7 +376,6 @@ export default function DeviceList({
                         patchDevice(d.id, { name });
                       }}
                     />
-                    <FirmwareUpdateBadge fw={d.fw} missing={missingFor(d)} onClick={() => setFilesFor({ name: d.name })} />
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-1.5">
@@ -423,6 +426,9 @@ export default function DeviceList({
                 <td className="px-4 py-2.5">
                   {d.lastStatus != null ? <StatusBadge status={d.lastStatus} error={d.lastError} /> : dash}
                 </td>
+                <td className="px-4 py-2.5">
+                  <FirmwareCell fw={d.fw} polled={!!d.lastPollAt} missing={missingFor(d)} onUpdate={() => setFilesFor({ name: d.name })} />
+                </td>
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-0.5">
                     {busy === d.id && <Loader2 size={13} className="animate-spin text-muted" />}
@@ -437,25 +443,6 @@ export default function DeviceList({
                     />
                     <DeviceInfoButton d={d} now={now} />
                     <LivePreviewButton deviceId={d.id} deviceName={d.name} fw={d.fw} polled={!!d.lastPollAt} />
-                    <button
-                      type="button"
-                      onClick={() => setFilesFor({ name: d.name })}
-                      title="ESP32 firmware files for this device (paste the key into config.h)"
-                      aria-label={`Setup files for ${d.name}`}
-                      className={iconButton}
-                    >
-                      <FileCode2 size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void onRegenerate(d)}
-                      disabled={busy !== null}
-                      title="Regenerate key"
-                      aria-label={`Regenerate key for ${d.name}`}
-                      className={iconButton}
-                    >
-                      <KeyRound size={13} />
-                    </button>
                     <TransferDeviceButton
                       deviceId={d.id}
                       deviceName={d.name}
@@ -476,13 +463,20 @@ export default function DeviceList({
                     >
                       <Trash2 size={13} />
                     </button>
+                    <ActionMenu
+                      label={`More actions for ${d.name}`}
+                      items={[
+                        { label: "Setup files", icon: <FileCode2 size={13} />, onSelect: () => setFilesFor({ name: d.name }) },
+                        { label: "Regenerate key", icon: <KeyRound size={13} />, onSelect: () => void onRegenerate(d), disabled: busy !== null },
+                      ]}
+                    />
                   </div>
                 </td>
               </tr>
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-[13px] text-muted">
+                <td colSpan={8} className="px-4 py-10 text-center text-[13px] text-muted">
                   No devices match.
                 </td>
               </tr>

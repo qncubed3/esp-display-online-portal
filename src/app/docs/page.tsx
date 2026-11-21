@@ -274,7 +274,7 @@ export default function DocsPage() {
               <li>
                 <B>Rotation</B>: shapes (lines, rectangles, rounded rectangles, triangles) and text take an optional last
                 arg, degrees clockwise about the item&apos;s centre. Rotated shapes work on every device; rotated text needs
-                firmware 2.0 (older devices draw it unrotated). Rotated items can be moved on the preview but not resized.
+                firmware v2 (older devices draw it unrotated). Rotated items can be moved on the preview but not resized.
                 To turn a whole display upside down, use Rotate 180° on that device in the Devices page instead.
               </li>
             </List>
@@ -420,8 +420,8 @@ export default function DocsPage() {
               Devices call <Code>GET /api/device/frame?since=&lt;id&gt;</Code> with{" "}
               <Code>Authorization: Bearer esk_…</Code>. Responses: <Code>200</Code> frame JSON, <Code>304</Code> unchanged,{" "}
               <Code>204</Code> disabled, <Code>401</Code> bad key; <Code>X-Next-Poll</Code> says when to call again. Firmware
-              2.0+ also sends <Code>X-Frame-Version: 2</Code> and gets v2 frames (screen orientation <Code>rot</Code> and
-              rotated text); without it the server sends v1 frames, which 1.x firmware draws as before. To test without a
+              v2 also sends <Code>X-Frame-Version: 2</Code> and gets v2 frames (screen orientation <Code>rot</Code> and
+              rotated text); without it the server sends v1 frames, which v1 firmware draws as before. To test without a
               device:
             </P>
             <Pre>{`curl "https://<your-portal>/api/device/frame?key=esk_..."`}</Pre>

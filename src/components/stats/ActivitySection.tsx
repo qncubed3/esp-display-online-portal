@@ -8,6 +8,7 @@ import { AlertCircle, Loader2, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/components/ui/cn";
 import { Skeleton as Pill } from "@/components/ui/Skeleton";
+import { firmwareLabel } from "@/lib/firmware/version";
 import { timeAgo } from "@/lib/time";
 import { ACTIVITY_RANGES, type ActivityRange, type RecentPoll, type ServiceActivity } from "@/lib/polls/types";
 import TimeChart, { Legend } from "./TimeChart";
@@ -409,7 +410,7 @@ function DeviceTable({ devices }: { devices: ServiceActivity["devices"] }) {
                 <td className={cn(td, "text-right")}>{d.rssi == null ? "—" : `${d.rssi} dBm`}</td>
                 <td className={cn(td, "text-right")}>{fmtBytes(d.heap)}</td>
                 <td className={cn(td, "text-right")}>{fmtUptime(d.uptimeS)}</td>
-                <td className={cn(td, "font-mono text-muted")}>{d.fw ?? "—"}</td>
+                <td className={cn(td, "font-mono text-muted")}>{firmwareLabel(d.fw) ?? d.fw ?? "—"}</td>
               </tr>
             ))}
           </tbody>

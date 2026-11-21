@@ -47,18 +47,18 @@ export interface DrawRow {
 export type WireOp = [string, ...(string | number)[]];
 
 // What the device endpoint returns (built in src/lib/draw/frame.ts). The schema is negotiated:
-// firmware 2.0+ sends X-Frame-Version: 2 and gets v2; everything else gets v1, exactly as before.
+// firmware v2+ sends X-Frame-Version: 2 and gets v2; everything else gets v1, exactly as before.
 interface FrameBase {
   id: string; // hash of everything drawn (version, orientation, ops); the device sends it back as ?since=
   next: number; // seconds until the next poll
   poll: number; // this device's poll interval (the device stores it); also sent as X-Poll-Interval
   ops: WireOp[];
 }
-/** Firmware 1.x: rejects any other `v`, skips unknown ops. No drawStringRot (degraded to drawString). */
+/** Firmware v1: rejects any other `v`, skips unknown ops. No drawStringRot (degraded to drawString). */
 export interface FrameV1 extends FrameBase {
   v: 1;
 }
-/** Firmware 2.0+: adds `rot` and the drawStringRot op. */
+/** Firmware v2+: adds `rot` and the drawStringRot op. */
 export interface FrameV2 extends FrameBase {
   v: 2;
   rot: 1 | 3; // tft.setRotation(): 1 = landscape, 3 = landscape turned 180 degrees (the device's setting)
@@ -76,7 +76,7 @@ export const ANGLE_KEY = "angle";
 // JSON saved before it existed load unchanged. Any whole number works; the presets are quick picks.
 const angle = (textOnly = false): Field => ({
   key: ANGLE_KEY, label: "Rotation", type: "int", default: 0, optional: true, presets: [0, 90, 180, 270],
-  ...(textOnly ? { minFrame: 2, hint: "Rotated text needs firmware 2.0 on the device; older firmware draws it unrotated." } : {}),
+  ...(textOnly ? { minFrame: 2, hint: "Rotated text needs firmware v2 on the device; older firmware draws it unrotated." } : {}),
 });
 const pt = (n: number, dx: number, dy: number): Field[] => [
   { key: `x${n}`, label: `X${n}`, type: "int", default: dx },

@@ -4,8 +4,8 @@
 // Nothing stores the frame a device was sent, so the screen is rebuilt here the same way the poll
 // endpoint (src/app/api/device/frame/route.ts) builds it: the Service's saved Draw ops filled with
 // the saved Data code's current variables (POST /api/preview with no `code`). Close enough, not exact.
-// Like the endpoint, a device on 1.x firmware is shown its v1 frame (rotated text unrotated, 180°
-// rotation ignored); a rotated device on 2.0+ is shown turned 180°, as someone facing it sees it.
+// Like the endpoint, a device on v1 firmware is shown its v1 frame (rotated text unrotated, 180°
+// rotation ignored); a rotated device on v2+ is shown turned 180°, as someone facing it sees it.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MonitorPlay } from "lucide-react";

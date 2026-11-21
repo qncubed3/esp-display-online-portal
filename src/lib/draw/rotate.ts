@@ -13,7 +13,7 @@
 
 import type { WireOp } from "./ops";
 
-/** Device op for rotated text: drawString's args plus the angle. Frame v2 and firmware 2.0+. */
+/** Device op for rotated text: drawString's args plus the angle. Frame v2 and firmware v2+. */
 export const TEXT_ROT_OP = "drawStringRot";
 
 /** Degrees as a whole number in 0..359 (anything unreadable is 0). */
@@ -129,7 +129,7 @@ export function rotateOp(op: WireOp, deg: number): WireOp[] {
   }
 }
 
-/** Ops a v1 device (firmware 1.x) can draw: rotated text drawn unrotated. Other ops are already v1 ops. */
+/** Ops a v1 device (firmware v1) can draw: rotated text drawn unrotated. Other ops are already v1 ops. */
 export function toV1Ops(ops: WireOp[]): WireOp[] {
   return ops.map((op) => (op[0] === TEXT_ROT_OP ? (["drawString", ...op.slice(1, 5)] as WireOp) : op));
 }

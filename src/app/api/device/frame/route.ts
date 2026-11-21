@@ -4,7 +4,7 @@
 //   GET /api/device/frame?since=<id> 304 when the frame hasn't changed
 //
 // Responses: 200 Frame JSON | 304 unchanged | 204 service disabled | 401 bad key.
-// Frame schema: v2 when the device sends X-Frame-Version: 2 (firmware 2.0+), otherwise v1, with
+// Frame schema: v2 when the device sends X-Frame-Version: 2 (firmware v2+), otherwise v1, with
 // anything v1 can't draw degraded (see src/lib/draw/frame.ts). A 200 says what was degraded, if
 // anything, in X-Frame-Degraded (feature names from src/lib/draw/capabilities.ts).
 // A device with no Service (or one its owner can no longer access) gets a 200 "No service assigned"

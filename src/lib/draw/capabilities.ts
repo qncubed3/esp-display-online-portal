@@ -56,7 +56,7 @@ export function missingFeatures(needed: Feature[], frameVersion: number | null):
   return needed.filter((f) => FEATURES[f].minFrame > frameVersion);
 }
 
-/** "Rotated text shows unrotated and the 180° screen rotation won't apply until you reflash with EspDisplay 2.0.0." */
+/** "Rotated text shows unrotated and the 180° screen rotation won't apply until you reflash with firmware v2." */
 export function missingSentence(missing: Feature[]): string {
   if (!missing.length) return "";
   const parts = missing.map((f) => FEATURES[f].degraded);

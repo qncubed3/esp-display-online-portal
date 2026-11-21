@@ -7,7 +7,7 @@ import { AlertCircle, Check, Copy, FileCode2, RotateCw, Loader2, X } from "lucid
 import { Select } from "@/components/ui/Select";
 import { setDevicePollSeconds, setDeviceRotation, setDeviceService, type SubscribableService } from "@/lib/devices/actions";
 import { FEATURES, missingSentence, type Feature } from "@/lib/draw/capabilities";
-import { firmwareForFrame } from "@/lib/firmware/version";
+import { FW_LATEST, firmwareForFrame, firmwareLabel, firmwareStatus } from "@/lib/firmware/version";
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -366,7 +366,7 @@ export function AddDeviceForm({
 }
 
 // Rotates the device's whole screen 180° (for a display mounted upside down) or back. Not a mirror:
-// text stays readable. The state shows in the icon (green when rotated). Firmware older than 2.0
+// text stays readable. The state shows in the icon (green when rotated). Firmware older than v2
 // ignores the setting: it's
 // saved anyway and applies once the device is reflashed, and the tooltip says so.
 export function ScreenRotationButton({
@@ -449,7 +449,7 @@ export function ScreenRotationButton({
 // (rotated text, the screen rotated 180°). Nothing for devices that need nothing new, however old.
 export function FirmwareUpdateBadge({ fw, missing, onClick }: { fw: string | null; missing: Feature[]; onClick?: () => void }) {
   if (!missing.length) return null;
-  const title = `Running ${fw ?? "older firmware"}. ${missingSentence(missing)} Click for the setup files, then upload them again.`;
+  const title = `Running ${firmwareLabel(fw) ? `firmware ${firmwareLabel(fw)}` : "older firmware"}. ${missingSentence(missing)} Click for the setup files, then upload them again.`;
   return (
     <button
       type="button"
@@ -459,5 +459,43 @@ export function FirmwareUpdateBadge({ fw, missing, onClick }: { fw: string | nul
     >
       <AlertCircle size={11} aria-hidden /> Update firmware
     </button>
+  );
+}
+
+// The Firmware column: the version the device last reported (v1, v2, ...) and whether it's out of
+// date. Amber "Update firmware" when its screen uses something its firmware can't draw; otherwise a
+// quiet "Out of date" pill when newer firmware exists. A device that polled without reporting a
+// version predates X-FW, so it's v1.
+export function FirmwareCell({
+  fw,
+  polled,
+  missing,
+  onUpdate,
+}: {
+  fw: string | null;
+  polled: boolean;
+  missing: Feature[];
+  onUpdate?: () => void;
+}) {
+  const label = firmwareLabel(fw) ?? (polled ? "v1" : null);
+  const outdated = firmwareStatus(fw) === "outdated" || (polled && !firmwareLabel(fw));
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <span className="font-mono text-[12px]" title={fw ?? (polled ? "Not reported (older firmware)" : "Hasn't polled yet")}>
+        {label ?? "—"}
+      </span>
+      {missing.length > 0 ? (
+        <FirmwareUpdateBadge fw={fw} missing={missing} onClick={onUpdate} />
+      ) : outdated ? (
+        <button
+          type="button"
+          onClick={onUpdate}
+          title={`Latest is ${FW_LATEST}. Nothing on this device's screen needs it yet; download the setup files and upload them to update.`}
+          className="rounded-full border border-border px-1.5 py-0.5 text-[11px] text-muted hover:bg-panel-hover hover:text-fg"
+        >
+          Out of date
+        </button>
+      ) : null}
+    </span>
   );
 }

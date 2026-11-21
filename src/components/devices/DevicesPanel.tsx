@@ -20,13 +20,14 @@ import {
   type SubscribableService,
 } from "@/lib/devices/actions";
 import { InlineRename } from "@/components/ui/InlineRename";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 import { Select } from "@/components/ui/Select";
 import LivePreviewButton from "./LivePreviewButton";
 import SetupFilesDialog from "./SetupFilesDialog";
 import { devicesChanged, refreshLists } from "@/lib/store/cache";
 import {
   AddDeviceForm,
-  FirmwareUpdateBadge,
+  FirmwareCell,
   NewKeyCallout,
   NextPollCountdown,
   PollFrequency,
@@ -239,6 +240,7 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
               <th className="px-3 py-2 font-normal">Next update</th>
               <th className="px-3 py-2 font-normal">Service</th>
               <th className="px-3 py-2 font-normal">Update frequency</th>
+              <th className="px-3 py-2 font-normal">Firmware</th>
               <th className="w-px px-3 py-2">
                 <span className="sr-only">Actions</span>
               </th>
@@ -247,14 +249,14 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
           <tbody>
             {devices === null && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={7} className="px-3 py-6 text-center text-[#a0a0a0]">
                   <Loader2 size={14} className="inline animate-spin" /> Loading…
                 </td>
               </tr>
             )}
             {devices?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-[#a0a0a0]">
+                <td colSpan={7} className="px-3 py-6 text-center text-[#a0a0a0]">
                   No devices on this service yet. Add one, or move one of your devices here.
                 </td>
               </tr>
@@ -280,13 +282,6 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                         />
                       ) : (
                         d.name
-                      )}
-                      {d.mine && (
-                        <FirmwareUpdateBadge
-                          fw={d.fw}
-                          missing={deviceMissingFeatures({ rotation: d.rotation, contentNeeds: d.content_needs, fw: d.fw, polled: d.polled })}
-                          onClick={() => setFilesFor({ name: d.name })}
-                        />
                       )}
                       {!d.mine && (
                         <span
@@ -325,6 +320,14 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                       <span className="text-[#a0a0a0]">{pollLabel(d.poll_seconds ?? 30)}</span>
                     )}
                   </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <FirmwareCell
+                      fw={d.fw}
+                      polled={d.polled}
+                      missing={deviceMissingFeatures({ rotation: d.rotation, contentNeeds: d.content_needs, fw: d.fw, polled: d.polled })}
+                      onUpdate={d.mine ? () => setFilesFor({ name: d.name }) : undefined}
+                    />
+                  </td>
                   <td className="px-3 py-1.5">
                     {d.mine && (
                       <div className="flex items-center justify-end gap-1">
@@ -342,23 +345,6 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                         <LivePreviewButton deviceId={d.id} deviceName={d.name} fw={d.fw} polled={d.polled} />
                         <button
                           type="button"
-                          onClick={() => setFilesFor({ name: d.name })}
-                          title="ESP32 firmware files for this device"
-                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed]"
-                        >
-                          <FileCode2 size={13} /> Setup files
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onRegenerate(d)}
-                          disabled={busy !== null}
-                          title="Regenerate key"
-                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-[#ededed] disabled:opacity-50"
-                        >
-                          <KeyRound size={13} /> Regenerate key
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => onDelete(d)}
                           disabled={busy !== null}
                           title="Delete device"
@@ -367,6 +353,13 @@ export default function DevicesPanel({ serviceId }: { serviceId: string }) {
                         >
                           <Trash2 size={13} />
                         </button>
+                        <ActionMenu
+                          label={`More actions for ${d.name}`}
+                          items={[
+                            { label: "Setup files", icon: <FileCode2 size={13} />, onSelect: () => setFilesFor({ name: d.name }) },
+                            { label: "Regenerate key", icon: <KeyRound size={13} />, onSelect: () => onRegenerate(d), disabled: busy !== null },
+                          ]}
+                        />
                       </div>
                     )}
                   </td>

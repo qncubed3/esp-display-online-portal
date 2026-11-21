@@ -234,7 +234,7 @@ export async function setDevicePollSeconds(deviceId: string, seconds: number): P
 }
 
 // Turns the device's screen 180° (3) or back to normal (1), for a display mounted upside down.
-// Firmware 2.0+ picks it up on its next poll; 1.x firmware ignores it until reflashed.
+// Firmware v2+ picks it up on its next poll; v1 firmware ignores it until reflashed.
 export async function setDeviceRotation(deviceId: string, rotation: number): Promise<void> {
   if (rotation !== 1 && rotation !== 3) throw new Error("Rotation must be 1 (normal) or 3 (rotated 180°).");
   try {

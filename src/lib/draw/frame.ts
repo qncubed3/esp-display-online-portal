@@ -1,12 +1,12 @@
 // Builds the Frame the device endpoint sends, in the schema the device asked for.
 //
-// Negotiation: firmware 2.0+ sends `X-Frame-Version: 2` and gets a v2 frame; a request without it
-// (every 1.x device) gets a v1 frame, exactly as before v2 existed, with anything v1 can't draw
+// Negotiation: firmware v2+ sends `X-Frame-Version: 2` and gets a v2 frame; a request without it
+// (every v1 device) gets a v1 frame, exactly as before v2 existed, with anything v1 can't draw
 // degraded rather than broken: drawStringRot becomes a plain drawString (text unrotated) and the
 // device's orientation is left out (v1 firmware always draws landscape, rotation 1).
 //
 // The id is a hash of everything that changes what's drawn, so a new orientation forces a redraw:
-// v1: the ops (unchanged from before v2, so 1.x devices don't redraw just because of a deploy);
+// v1: the ops (unchanged from before v2, so v1 devices don't redraw just because of a deploy);
 // v2: the version, the orientation and the ops.
 
 import { createHash } from "node:crypto";
