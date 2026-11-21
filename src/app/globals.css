@@ -42,6 +42,13 @@ body {
   animation: skeleton-sweep 1.4s linear infinite;
 }
 
+/* Loading screen preview: the same sweep on the near-black screen, in darker greys. */
+.skeleton-screen {
+  background: linear-gradient(90deg, #050505 0%, #050505 35%, #1a1a1a 50%, #050505 65%, #050505 100%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s linear infinite;
+}
+
 @keyframes skeleton-sweep {
   from {
     background-position: 100% 0;
@@ -52,7 +59,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .skeleton,
+  .skeleton-screen {
     animation: none;
   }
 }
