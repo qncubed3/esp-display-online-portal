@@ -22,6 +22,7 @@ export default function DevicePreview({
   onPointerDown,
   onKeyDown,
   cursor = "crosshair",
+  interactive = false,
 }: {
   ops: WireOp[];
   scale?: number;
@@ -30,6 +31,8 @@ export default function DevicePreview({
   onPointerDown?(e: PointerEvent<HTMLCanvasElement>): void;
   onKeyDown?(e: KeyboardEvent<HTMLCanvasElement>): void;
   cursor?: string;
+  /** Dragging on it edits the screen, so touch gestures must not scroll the page. Off for thumbnails. */
+  interactive?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
@@ -58,7 +61,7 @@ export default function DevicePreview({
             onPointerDown={onPointerDown}
             onKeyDown={onKeyDown}
             tabIndex={onKeyDown ? 0 : undefined}
-            className="block max-w-full touch-none bg-black outline-none"
+            className={`block max-w-full bg-black outline-none ${interactive ? "touch-none" : ""}`}
             style={{
               width: SCREEN_WIDTH * scale,
               aspectRatio: `${SCREEN_WIDTH} / ${SCREEN_HEIGHT}`,

@@ -336,6 +336,7 @@ export default function EditablePreview({
         overlay={overlay}
         onKeyDown={onKeyDown}
         cursor={cursor || "crosshair"}
+        interactive
       />
       {full && <p className="mt-1 text-center text-[12px] text-[#a0a0a0]">{hint}</p>}
     </div>
